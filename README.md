@@ -176,4 +176,4 @@ Ce projet est développé dans le cadre d'un programme de recherche en E-Santé 
 > 💡 **Note** : Cette application est un prototype de recherche. Elle ne remplace pas un avis médical professionnel.
 
 
-flutter run -d linux
+flutter run -d linux# Dalys
