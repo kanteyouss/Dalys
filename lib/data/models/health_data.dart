@@ -2,28 +2,40 @@ import 'package:flutter/material.dart';
 import '../../core/enums/app_enums.dart';
 
 class HealthData {
+  final int? userId;
   final DateTime date;
   final int spo2; // Saturation O₂ (95-100%)
   final int breathingRate; // Fréquence respiratoire (12-20 bpm)
   final double pef; // Débit de pointe (L/min)
+  final double? temperature; // Température corporelle (DS18B20)
+  final double? humidity; // Humidité ambiante (DHT22)
+  final double? envTemperature; // Température ambiante (DHT22)
   final List<String> symptoms;
   final RiskLevel riskLevel;
 
   HealthData({
+    this.userId,
     required this.date,
     required this.spo2,
     required this.breathingRate,
     required this.pef,
+    this.temperature,
+    this.humidity,
+    this.envTemperature,
     required this.symptoms,
     required this.riskLevel,
   });
 
   factory HealthData.fromJson(Map<String, dynamic> json) {
     return HealthData(
+      userId: json['user_id'],
       date: DateTime.parse(json['date']),
       spo2: json['spo2'],
       breathingRate: json['breathing_rate'],
       pef: json['pef'].toDouble(),
+      temperature: json['temperature']?.toDouble(),
+      humidity: json['humidity']?.toDouble(),
+      envTemperature: json['env_temperature']?.toDouble(),
       symptoms: List<String>.from(json['symptoms']),
       riskLevel: RiskLevel.values.firstWhere(
         (e) => e.name == json['risk_level'],
@@ -34,13 +46,43 @@ class HealthData {
 
   Map<String, dynamic> toJson() {
     return {
+      'user_id': userId,
       'date': date.toIso8601String(),
       'spo2': spo2,
       'breathing_rate': breathingRate,
       'pef': pef,
+      'temperature': temperature,
+      'humidity': humidity,
+      'env_temperature': envTemperature,
       'symptoms': symptoms,
       'risk_level': riskLevel.name,
     };
+  }
+
+  HealthData copyWith({
+    int? userId,
+    DateTime? date,
+    int? spo2,
+    int? breathingRate,
+    double? pef,
+    double? temperature,
+    double? humidity,
+    double? envTemperature,
+    List<String>? symptoms,
+    RiskLevel? riskLevel,
+  }) {
+    return HealthData(
+      userId: userId ?? this.userId,
+      date: date ?? this.date,
+      spo2: spo2 ?? this.spo2,
+      breathingRate: breathingRate ?? this.breathingRate,
+      pef: pef ?? this.pef,
+      temperature: temperature ?? this.temperature,
+      humidity: humidity ?? this.humidity,
+      envTemperature: envTemperature ?? this.envTemperature,
+      symptoms: symptoms ?? this.symptoms,
+      riskLevel: riskLevel ?? this.riskLevel,
+    );
   }
 
   Color getRiskColor() {
@@ -80,8 +122,7 @@ class HealthData {
   bool get isSpo2Normal => spo2 >= 95;
   bool get isBreathingRateNormal => breathingRate >= 12 && breathingRate <= 20;
   bool get isPefNormal => pef >= 350;
-  
-  bool get hasAnyAbnormalValue => !isSpo2Normal || !isBreathingRateNormal || !isPefNormal;
+
+  bool get hasAnyAbnormalValue =>
+      !isSpo2Normal || !isBreathingRateNormal || !isPefNormal;
 }
-
-

@@ -26,6 +26,9 @@ class MockHealthProvider {
     final spo2 = 94 + _random.nextInt(6); // 94-99%
     final breathingRate = 14 + _random.nextInt(8); // 14-21 bpm
     final pef = 300.0 + _random.nextInt(200); // 300-500 L/min
+    final temperature = 36.5 + _random.nextDouble(); // 36.5-37.5 °C
+    final humidity = 40.0 + _random.nextInt(40); // 40-80%
+    final envTemperature = 20.0 + _random.nextInt(10); // 20-30 °C
     
     final symptoms = <String>[];
     final allSymptoms = ['toux', 'fatigue', 'essoufflement', 'douleur thoracique', 'oppression'];
@@ -54,6 +57,9 @@ class MockHealthProvider {
       spo2: spo2,
       breathingRate: breathingRate,
       pef: pef,
+      temperature: temperature,
+      humidity: humidity,
+      envTemperature: envTemperature,
       symptoms: symptoms,
       riskLevel: riskLevel,
     );
@@ -74,12 +80,16 @@ class MockHealthProvider {
       final baseSpo2 = 96 + (sin(i * 0.5) * 2).round();
       final baseBreathingRate = 18 + (cos(i * 0.3) * 2).round();
       final basePef = 400 + (sin(i * 0.4) * 50);
+      final baseTemp = 37.0 + (sin(i * 0.2) * 0.5);
       
       data.add(HealthData(
         date: date,
         spo2: (baseSpo2 + _random.nextInt(3) - 1).clamp(90, 99),
         breathingRate: (baseBreathingRate + _random.nextInt(3) - 1).clamp(12, 25),
         pef: (basePef + _random.nextInt(50) - 25).clamp(250, 500),
+        temperature: (baseTemp + _random.nextDouble() - 0.5).clamp(36.0, 39.0),
+        humidity: (60.0 + _random.nextInt(20)).toDouble(),
+        envTemperature: (25.0 + _random.nextInt(5)).toDouble(),
         symptoms: _getRandomSymptoms(),
         riskLevel: RiskLevel.values[_random.nextInt(3)],
       ));

@@ -38,6 +38,11 @@ E-Santé 4.0 - DALYS est une application mobile développée en Flutter qui util
 - **Graphiques** : FL Chart
 - **Architecture** : Clean Architecture avec séparation des couches
 - **Données** : Mock Data Provider (en attente des vrais capteurs/APIs)
+- **Hardware / IoT** :
+  - **Microcontrôleur** : ESP32 (Collecte et transmission)
+  - **Température/Humidité** : DHT22
+  - **Cardio/SpO₂** : MAX30100
+  - **Température Précise** : DS18B20 (soudé)
 
 ## 📱 Installation et Configuration
 
@@ -173,9 +178,178 @@ Ce projet est développé dans le cadre d'un programme de recherche en E-Santé 
 
 ---
 
+
+D’accord, voici une **version plus simple, claire et accessible**, tout en restant propre et bien rédigée — comme un guide utilisateur grand public.
+
+---
+
+# 📊 Guide Utilisateur – Suivi de votre santé respiratoire
+
+**Application E-Santé 4.0 – DALYS**
+
+## 🏥 À quoi sert cette fonctionnalité ?
+
+Elle vous permet de **surveiller facilement votre respiration** grâce à trois indicateurs importants :
+
+* la saturation en oxygène (SpO₂)
+* la fréquence respiratoire
+* le débit de pointe (PEF)
+
+Ces informations vous aident à comprendre rapidement si tout va bien ou si vous devez faire attention.
+
+---
+
+## 💾 Comment les données sont-elles affichées ?
+
+### 🔄 Données de démonstration
+
+Pour le moment, l’application utilise **des données simulées**. Cela vous permet :
+
+* de découvrir toutes les fonctionnalités
+* de tester le tableau de bord
+* de voir comment évoluent les indicateurs
+* d’apprendre à utiliser l’application **sans capteur médical**
+
+Les valeurs changent automatiquement toutes les **10 secondes**, comme si elles venaient d’un vrai appareil.
+
+### 🌐 Plus tard : connexion à de vrais capteurs
+
+Les futures versions permettront de connecter :
+
+* un **oxymètre Bluetooth** pour la SpO₂
+* un **capteur respiratoire Wi-Fi**
+* un **débitmètre connecté** pour le PEF
+
+L’affichage ne changera pas : seules les données deviendront réelles.
+
+---
+
+## 📱 Ce que vous voyez à l’écran
+
+1. **Des cartes colorées** affichant chaque mesure
+
+   * Valeur actuelle
+   * Unité (% / bpm / L/min)
+   * Couleur d’alerte (vert, orange, rouge)
+   * Une petite icône
+
+2. **Des graphiques simples** pour voir comment les valeurs évoluent dans le temps
+
+3. **Un indicateur global** qui vous dit rapidement si votre état est normal, à surveiller ou en alerte.
+
+---
+
+## 🔍 Les trois mesures expliquées simplement
+
+### 1. 💓 SpO₂ (saturation en oxygène)
+
+* Mesure le taux d’oxygène dans votre sang
+* Normal : **95 % à 100 %**
+* Si la valeur descend, cela peut indiquer une gêne respiratoire
+
+### 2. 🫁 Fréquence respiratoire
+
+* Nombre de respirations par minute
+* Normal : **12 à 20 respirations/minute**
+
+### 3. 🌪️ Débit de pointe (PEF)
+
+* Mesure la force de votre expiration
+* Normal : **350 à 500 L/min**
+* Utile surtout pour l’asthme ou les problèmes pulmonaires
+
+---
+
+## 🎨 Que signifient les couleurs ?
+
+* 🟢 **Vert** : Tout va bien
+* 🟡 **Orange** : À surveiller
+* 🔴 **Rouge** : Attention, valeur anormale
+
+---
+
+## 📱 Comment utiliser la fonctionnalité ?
+
+### 1. Ouvrez l’application
+
+Le tableau de bord apparaît automatiquement.
+
+### 2. Lisez vos indicateurs
+
+Regardez les trois cartes :
+
+* la valeur
+* la couleur
+* l’icône
+* l’indicateur global
+
+### 3. Ajouter une mesure manuelle
+
+* Appuyez sur **“Nouvelle mesure”**
+* Entrez vos valeurs si vous utilisez votre propre appareil
+
+---
+
+## 🎯 Scénarios simples
+
+### 🟢 Scénario 1 : Tout est normal
+
+Exemple :
+
+* SpO₂ 98 %
+* Respiration 16 bpm
+* Débit 420 L/min
+  → **Continuez vos activités normalement.**
+
+### 🟡 Scénario 2 : Une valeur en alerte
+
+Exemple :
+
+* SpO₂ 91 % (Rouge)
+  → Reposez-vous et surveillez votre état. Si ça persiste, contactez un médecin.
+
+### 🔴 Scénario 3 : Plusieurs valeurs anormales
+
+Exemple :
+
+* SpO₂ 89 %
+* Respiration 26 bpm
+  → **Contactez immédiatement un professionnel de santé.**
+
+---
+
+## 📊 Suivi dans le temps
+
+L’application affiche :
+
+* la tendance de vos valeurs sur 7 jours
+* la moyenne, le minimum et le maximum
+  → Cela vous permet d’observer facilement votre évolution.
+
+---
+
+## 💡 Conseils d’utilisation
+
+* Prenez vos mesures **au calme**
+* Idéalement **le matin** ou en cas de gêne
+* Notez vos symptômes (toux, fatigue, essoufflement)
+* Regardez les tendances plutôt qu’une seule valeur
+
+---
+
+Si tu veux :
+✓ une version encore plus courte
+✓ une version avec emoji uniquement
+✓ une version adaptée pour une **présentation PowerPoint**
+✓ ou une version “fiche rapide”,
+je peux te la produire aussi.
+
+
+
 > 💡 **Note** : Cette application est un prototype de recherche. Elle ne remplace pas un avis médical professionnel.
 
 
 flutter run -d linux# Dalys
+flutter analyze
 # Dalys
 # Dalys

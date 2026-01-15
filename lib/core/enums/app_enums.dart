@@ -26,3 +26,7 @@ enum SeverityLevel {
   moyen,
   fort
 }
+
+// Les enums TypeAlerte et NiveauSeverite ont été déplacés vers le modèle unifié
+// pour éviter les conflits et centraliser la gestion des alertes.
+// Voir: lib/data/models/modele_alerte.dart ou lib/features/alertes/models/modele_alerte.dart

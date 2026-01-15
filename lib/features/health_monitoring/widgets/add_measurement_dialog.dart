@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../controllers/health_controller.dart';
 
@@ -14,11 +15,11 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
   final _spo2Controller = TextEditingController();
   final _breathingRateController = TextEditingController();
   final _pefController = TextEditingController();
-  
+
   final List<String> _selectedSymptoms = [];
   final List<String> _availableSymptoms = [
     'Toux sèche',
-    'Toux grasse', 
+    'Toux grasse',
     'Essoufflement',
     'Fatigue',
     'Douleur thoracique',
@@ -40,7 +41,7 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -56,15 +57,16 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
                     Icon(
                       Icons.add_circle_outline,
                       color: Theme.of(context).primaryColor,
-                      size: 28,
+                      size: 32,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'Nouvelle mesure',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                       ),
                     ),
                     IconButton(
@@ -76,81 +78,58 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
                 const SizedBox(height: 24),
 
                 // Paramètres vitaux
-                Text(
-                  'Paramètres vitaux',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                _buildSectionTitle(context, 'Paramètres vitaux'),
                 const SizedBox(height: 16),
 
                 // SpO2
-                TextFormField(
+                _buildTextField(
                   controller: _spo2Controller,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Saturation en oxygène (SpO₂)',
-                    suffixText: '%',
-                    hintText: 'Ex: 98',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.favorite),
-                  ),
+                  label: 'Saturation en oxygène (SpO₂)',
+                  suffix: '%',
+                  hint: 'Ex: 98',
+                  icon: Icons.favorite,
+                  info: 'Mesure l\'oxygène dans le sang. Normal: 95-100%.',
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer la valeur SpO₂';
-                    }
+                    if (value == null || value.isEmpty) return 'Requis';
                     final spo2 = int.tryParse(value);
-                    if (spo2 == null || spo2 < 70 || spo2 > 100) {
-                      return 'Valeur invalide (70-100%)';
-                    }
+                    if (spo2 == null || spo2 < 70 || spo2 > 100)
+                      return 'Invalide (70-100%)';
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
 
                 // Fréquence respiratoire
-                TextFormField(
+                _buildTextField(
                   controller: _breathingRateController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Fréquence respiratoire',
-                    suffixText: 'bpm',
-                    hintText: 'Ex: 18',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.air),
-                  ),
+                  label: 'Fréquence respiratoire',
+                  suffix: 'bpm',
+                  hint: 'Ex: 18',
+                  icon: Icons.air,
+                  info: 'Nombre de respirations par minute. Normal: 12-20 bpm.',
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer la fréquence respiratoire';
-                    }
+                    if (value == null || value.isEmpty) return 'Requis';
                     final rate = int.tryParse(value);
-                    if (rate == null || rate < 8 || rate > 40) {
-                      return 'Valeur invalide (8-40 bpm)';
-                    }
+                    if (rate == null || rate < 8 || rate > 40)
+                      return 'Invalide (8-40 bpm)';
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
 
                 // Débit de pointe
-                TextFormField(
+                _buildTextField(
                   controller: _pefController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Débit de pointe (PEF)',
-                    suffixText: 'L/min',
-                    hintText: 'Ex: 400',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.timeline),
-                  ),
+                  label: 'Débit de pointe (PEF)',
+                  suffix: 'L/min',
+                  hint: 'Ex: 400',
+                  icon: Icons.timeline,
+                  info: 'Vitesse maximale d\'expiration. Évalue le souffle.',
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer le débit de pointe';
-                    }
+                    if (value == null || value.isEmpty) return 'Requis';
                     final pef = double.tryParse(value);
-                    if (pef == null || pef < 100 || pef > 800) {
-                      return 'Valeur invalide (100-800 L/min)';
-                    }
+                    if (pef == null || pef < 100 || pef > 800)
+                      return 'Invalide (100-800)';
                     return null;
                   },
                 ),
@@ -158,12 +137,7 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
                 const SizedBox(height: 24),
 
                 // Symptômes
-                Text(
-                  'Symptômes ressentis (optionnel)',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                _buildSectionTitle(context, 'Symptômes (optionnel)'),
                 const SizedBox(height: 12),
 
                 Wrap(
@@ -175,6 +149,7 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
                       label: Text(symptom),
                       selected: isSelected,
                       onSelected: (selected) {
+                        HapticFeedback.selectionClick();
                         setState(() {
                           if (selected) {
                             _selectedSymptoms.add(symptom);
@@ -183,8 +158,11 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
                           }
                         });
                       },
-                      selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                      selectedColor:
+                          Theme.of(context).primaryColor.withOpacity(0.2),
                       checkmarkColor: Theme.of(context).primaryColor,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                     );
                   }).toList(),
                 ),
@@ -197,6 +175,11 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => Navigator.of(context).pop(),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
                         child: const Text('Annuler'),
                       ),
                     ),
@@ -204,6 +187,12 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: _saveMeasurement,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          elevation: 4,
+                        ),
                         child: const Text('Enregistrer'),
                       ),
                     ),
@@ -217,21 +206,86 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
     );
   }
 
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: Colors.grey.shade800,
+          ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String suffix,
+    required String hint,
+    required IconData icon,
+    required String info,
+    required String? Function(String?) validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: label,
+                  suffixText: suffix,
+                  hintText: hint,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: Icon(icon),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
+                validator: validator,
+              ),
+            ),
+            IconButton(
+              icon:
+                  const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+              onPressed: () => _showInfo(label, info),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showInfo(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(content),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('OK'))
+        ],
+      ),
+    );
+  }
+
   void _saveMeasurement() {
     if (_formKey.currentState!.validate()) {
+      HapticFeedback.mediumImpact();
       final spo2 = int.parse(_spo2Controller.text);
       final breathingRate = int.parse(_breathingRateController.text);
       final pef = double.parse(_pefController.text);
 
-      // Ajouter la mesure via le contrôleur
       context.read<HealthController>().addManualMeasurement(
-        spo2: spo2,
-        breathingRate: breathingRate,
-        pef: pef,
-        symptoms: _selectedSymptoms,
-      );
+            spo2: spo2,
+            breathingRate: breathingRate,
+            pef: pef,
+            symptoms: _selectedSymptoms,
+          );
 
-      // Afficher un message de confirmation
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(
@@ -241,15 +295,17 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
               Text('Mesure enregistrée avec succès !'),
             ],
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.green.shade600,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          margin: const EdgeInsets.all(16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
 
       Navigator.of(context).pop();
+    } else {
+      HapticFeedback.vibrate();
     }
   }
 }

@@ -1,6 +1,8 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../data/models/health_data.dart';
+import 'package:intl/intl.dart';
 
 class HealthChart extends StatelessWidget {
   final List<HealthData> data;
@@ -9,7 +11,6 @@ class HealthChart extends StatelessWidget {
   final Color color;
   final double? minY;
   final double? maxY;
-
   const HealthChart({
     super.key,
     required this.data,
@@ -84,7 +85,7 @@ class HealthChart extends StatelessWidget {
             SizedBox(
               height: 200,
               child: LineChart(
-                _buildChartData(),
+                _buildChartData(context),
               ),
             ),
             const SizedBox(height: 8),
@@ -180,7 +181,7 @@ class HealthChart extends StatelessWidget {
     );
   }
 
-  LineChartData _buildChartData() {
+  LineChartData _buildChartData(BuildContext context) {
     final spots = <FlSpot>[];
     final limitedData = data.length > 20 ? data.sublist(data.length - 20) : data;
 
@@ -189,11 +190,41 @@ class HealthChart extends StatelessWidget {
       spots.add(FlSpot(i.toDouble(), value));
     }
 
+    // Compute dynamic Y bounds if not provided
+    double computedMinY;
+    double computedMaxY;
+    if (spots.isEmpty) {
+      computedMinY = 0.0;
+      computedMaxY = 1.0;
+    } else {
+      computedMinY = spots.first.y;
+      computedMaxY = spots.first.y;
+      for (final s in spots) {
+        computedMinY = math.min(computedMinY, s.y);
+        computedMaxY = math.max(computedMaxY, s.y);
+      }
+      // Add padding
+      final range = (computedMaxY - computedMinY);
+      final pad = range == 0 ? (computedMaxY.abs() * 0.1 + 1.0) : range * 0.12;
+      computedMinY = (computedMinY - pad);
+      computedMaxY = (computedMaxY + pad);
+    }
+
+    final resolvedMinY = minY ?? computedMinY;
+    final resolvedMaxY = maxY ?? computedMaxY;
+
+    // Determine sensible intervals
+    final yIntervalAuto = ((resolvedMaxY - resolvedMinY) / 4.0).abs();
+    final yInterval = math.max(_getGridInterval(), yIntervalAuto > 0 ? yIntervalAuto : _getGridInterval());
+
+    // X axis interval: show up to 4 ticks
+    final bottomInterval = limitedData.length > 1 ? math.max(1, ((limitedData.length - 1) / 4).ceil()).toDouble() : 1.0;
+
     return LineChartData(
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
-        horizontalInterval: _getGridInterval(),
+        horizontalInterval: yInterval,
         getDrawingHorizontalLine: (value) {
           return FlLine(
             color: Colors.grey.shade300,
@@ -208,17 +239,21 @@ class HealthChart extends StatelessWidget {
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: 30,
-            interval: (limitedData.length / 4).ceil().toDouble(),
+            reservedSize: 40,
+            interval: bottomInterval,
             getTitlesWidget: (double value, TitleMeta meta) {
-              if (value.toInt() >= limitedData.length) return const SizedBox.shrink();
-              final index = value.toInt();
-              final date = limitedData[index].date;
+              if (limitedData.isEmpty) return const SizedBox.shrink();
+              final idx = value.round().clamp(0, limitedData.length - 1);
+              final date = limitedData[idx].date;
+              final label = '${date.day}/${date.month}';
               return SideTitleWidget(
                 axisSide: meta.axisSide,
-                child: Text(
-                  '${date.day}/${date.month}',
-                  style: const TextStyle(fontSize: 10),
+                child: Transform.rotate(
+                  angle: -math.pi / 6,
+                  child: Text(
+                    label,
+                    style: const TextStyle(fontSize: 10),
+                  ),
                 ),
               );
             },
@@ -227,8 +262,8 @@ class HealthChart extends StatelessWidget {
         leftTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            interval: _getGridInterval(),
-            reservedSize: 50,
+            interval: yInterval,
+            reservedSize: 54,
             getTitlesWidget: (double value, TitleMeta meta) {
               return Text(
                 _formatYAxisLabel(value),
@@ -275,8 +310,43 @@ class HealthChart extends StatelessWidget {
           ),
         ),
       ],
-      minY: minY,
-      maxY: maxY,
+      minY: resolvedMinY,
+      maxY: resolvedMaxY,
+      lineTouchData: LineTouchData(
+        touchTooltipData: LineTouchTooltipData(
+          getTooltipColor: (touchedSpot) => Colors.blueGrey.shade900,
+          getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
+            return touchedBarSpots.map((barSpot) {
+              final flSpot = barSpot;
+              final index = flSpot.x.toInt();
+              if (index < 0 || index >= limitedData.length) return null;
+              
+              final dataPoint = limitedData[index];
+              final dateStr = DateFormat('dd/MM HH:mm').format(dataPoint.date);
+              
+              return LineTooltipItem(
+                '$dateStr\n',
+                const TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+                children: [
+                  TextSpan(
+                    text: _formatYAxisLabel(flSpot.y),
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              );
+            }).toList();
+          },
+        ),
+        handleBuiltInTouches: true,
+      ),
     );
   }
 

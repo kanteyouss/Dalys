@@ -1,18 +1,25 @@
 import 'package:flutter/foundation.dart';
 import '../../../data/models/health_data.dart';
 import '../../../data/providers/mock_health_provider.dart';
+import '../../../data/services/sensor_service.dart';
+import '../../../data/services/auth_service.dart';
+import '../../../data/repositories/health_repository.dart';
 import '../../../core/enums/app_enums.dart';
 import 'dart:async';
 
 class HealthController extends ChangeNotifier {
   final MockHealthProvider _mockProvider = MockHealthProvider();
-  
+  final SensorService _sensorService = SensorService();
+  final HealthRepository _repository = HealthRepository();
+  final AuthService _authService = AuthService();
+
   // État des données
+  bool _isSimulationMode = true;
   HealthData? _currentHealthData;
   List<HealthData> _historicalData = [];
   bool _isLoading = false;
   String? _error;
-  
+
   // Stream subscription pour les données en temps réel
   StreamSubscription<HealthData>? _healthDataSubscription;
 
@@ -20,7 +27,10 @@ class HealthController extends ChangeNotifier {
   HealthData? get currentHealthData => _currentHealthData;
   List<HealthData> get historicalData => _historicalData;
   bool get isLoading => _isLoading;
+  bool get isSimulationMode => _isSimulationMode;
   String? get error => _error;
+
+  int? get _currentUserId => _authService.currentUser?.id;
 
   // Statistiques calculées
   double get averageSpo2 {
@@ -31,7 +41,8 @@ class HealthController extends ChangeNotifier {
 
   double get averageBreathingRate {
     if (_historicalData.isEmpty) return 0.0;
-    final sum = _historicalData.map((e) => e.breathingRate).reduce((a, b) => a + b);
+    final sum =
+        _historicalData.map((e) => e.breathingRate).reduce((a, b) => a + b);
     return sum / _historicalData.length;
   }
 
@@ -39,6 +50,14 @@ class HealthController extends ChangeNotifier {
     if (_historicalData.isEmpty) return 0.0;
     final sum = _historicalData.map((e) => e.pef).reduce((a, b) => a + b);
     return sum / _historicalData.length;
+  }
+
+  double get averageTemperature {
+    if (_historicalData.isEmpty) return 0.0;
+    final validData = _historicalData.where((e) => e.temperature != null);
+    if (validData.isEmpty) return 0.0;
+    final sum = validData.map((e) => e.temperature!).reduce((a, b) => a + b);
+    return sum / validData.length;
   }
 
   RiskLevel get currentRiskLevel {
@@ -51,18 +70,68 @@ class HealthController extends ChangeNotifier {
     _startRealTimeUpdates();
   }
 
+  Future<void> toggleSimulationMode(bool value) async {
+    _isSimulationMode = value;
+    stopRealTimeUpdates();
+
+    if (!_isSimulationMode) {
+      // Connexion aux capteurs réels
+      try {
+        _setLoading(true);
+        notifyListeners();
+        final connected = await _sensorService.connect();
+        if (!connected) {
+          _error = "Impossible de se connecter aux capteurs ESP32";
+          _isSimulationMode = true; // Revenir en simulation
+        }
+      } catch (e) {
+        _error = "Erreur de connexion: $e";
+        _isSimulationMode = true;
+      } finally {
+        _setLoading(false);
+      }
+    } else {
+      await _sensorService.disconnect();
+    }
+
+    _startRealTimeUpdates();
+    notifyListeners();
+  }
+
   /// Charge les données de santé (historique + actuelle)
   Future<void> loadHealthData() async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+
     try {
       _setLoading(true);
       _error = null;
 
-      // Charger l'historique
-      _historicalData = _mockProvider.getHistoricalData(days: 7);
-      
-      // Générer une donnée actuelle
-      _currentHealthData = _mockProvider.generateRealisticHealthData();
-      
+      // Charger l'historique depuis la DB pour cet utilisateur
+      final dbData = await _repository.getHealthData(userId: userId, limit: 50);
+
+      if (dbData.isNotEmpty) {
+        _historicalData = dbData.reversed.toList(); // Chronologique
+        _currentHealthData = dbData.first;
+      } else {
+        // Si DB vide, charger mock initial et sauvegarder pour cet utilisateur
+        _historicalData = _mockProvider
+            .getHistoricalData(days: 7)
+            .map((d) => d.copyWith(userId: userId))
+            .toList();
+        _currentHealthData = _mockProvider
+            .generateRealisticHealthData()
+            .copyWith(userId: userId);
+
+        // Sauvegarder les données mockées pour la prochaine fois
+        for (var data in _historicalData) {
+          await _repository.insertHealthData(data);
+        }
+        if (_currentHealthData != null) {
+          await _repository.insertHealthData(_currentHealthData!);
+        }
+      }
+
       _setLoading(false);
       notifyListeners();
     } catch (e) {
@@ -72,19 +141,53 @@ class HealthController extends ChangeNotifier {
     }
   }
 
+  // Dépendance vers le contrôleur d'alertes
+  // On utilise dynamic pour éviter le couplage fort circulaire au niveau des imports
+  // dans une architecture plus complexe, on utiliserait une interface
+  dynamic _controleurAlertes;
+
+  void setControleurAlertes(dynamic controleur) {
+    _controleurAlertes = controleur;
+  }
+
   /// Démarre les mises à jour en temps réel
   void _startRealTimeUpdates() {
     _healthDataSubscription?.cancel();
-    _healthDataSubscription = _mockProvider.getHealthDataStream().listen(
-      (newData) {
-        _currentHealthData = newData;
-        
+
+    Stream<HealthData> stream;
+    if (_isSimulationMode) {
+      stream = _mockProvider.getHealthDataStream();
+    } else {
+      stream = _sensorService.sensorStream;
+    }
+
+    _healthDataSubscription = stream.listen(
+      (newData) async {
+        final userId = _currentUserId;
+        if (userId == null) return;
+
+        // Associer l'utilisateur actuel aux données
+        final userSpecificData = newData.copyWith(userId: userId);
+        _currentHealthData = userSpecificData;
+
+        // Sauvegarder en DB
+        await _repository.insertHealthData(userSpecificData);
+
         // Ajouter à l'historique (garder seulement les 50 derniers points)
-        _historicalData.add(newData);
+        _historicalData.add(userSpecificData);
         if (_historicalData.length > 50) {
           _historicalData.removeAt(0);
         }
-        
+
+        // Analyser pour les alertes si le contrôleur est lié
+        if (_controleurAlertes != null) {
+          try {
+            _controleurAlertes.analyserDonneesSante(userSpecificData);
+          } catch (e) {
+            debugPrint('Erreur lors de l\'analyse des alertes: $e');
+          }
+        }
+
         notifyListeners();
       },
       onError: (error) {
@@ -106,21 +209,28 @@ class HealthController extends ChangeNotifier {
   }
 
   /// Ajoute une nouvelle mesure manuelle
-  void addManualMeasurement({
+  Future<void> addManualMeasurement({
     required int spo2,
     required int breathingRate,
     required double pef,
     required List<String> symptoms,
-  }) {
+  }) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+
     // Calculer le niveau de risque
     RiskLevel riskLevel = RiskLevel.low;
     if (spo2 < 92 || breathingRate > 24 || pef < 300) {
       riskLevel = RiskLevel.high;
-    } else if (spo2 < 95 || breathingRate > 20 || pef < 350 || symptoms.isNotEmpty) {
+    } else if (spo2 < 95 ||
+        breathingRate > 20 ||
+        pef < 350 ||
+        symptoms.isNotEmpty) {
       riskLevel = RiskLevel.medium;
     }
 
     final newData = HealthData(
+      userId: userId,
       date: DateTime.now(),
       spo2: spo2,
       breathingRate: breathingRate,
@@ -129,9 +239,12 @@ class HealthController extends ChangeNotifier {
       riskLevel: riskLevel,
     );
 
+    // Sauvegarder en DB
+    await _repository.insertHealthData(newData);
+
     _currentHealthData = newData;
     _historicalData.add(newData);
-    
+
     // Garder seulement les 50 derniers points
     if (_historicalData.length > 50) {
       _historicalData.removeAt(0);
@@ -143,7 +256,9 @@ class HealthController extends ChangeNotifier {
   /// Obtient les données pour un graphique spécifique
   List<HealthData> getDataForChart(String chartType, {int days = 7}) {
     final cutoffDate = DateTime.now().subtract(Duration(days: days));
-    return _historicalData.where((data) => data.date.isAfter(cutoffDate)).toList();
+    return _historicalData
+        .where((data) => data.date.isAfter(cutoffDate))
+        .toList();
   }
 
   /// Vérifie si il y a des anomalies dans les données actuelles
@@ -155,8 +270,9 @@ class HealthController extends ChangeNotifier {
   /// Obtient le nombre de jours avec des anomalies dans l'historique
   int getAnomalyDaysCount({int days = 7}) {
     final cutoffDate = DateTime.now().subtract(Duration(days: days));
-    final recentData = _historicalData.where((data) => data.date.isAfter(cutoffDate)).toList();
-    
+    final recentData =
+        _historicalData.where((data) => data.date.isAfter(cutoffDate)).toList();
+
     final anomalyDays = <String>{};
     for (final data in recentData) {
       if (data.hasAnyAbnormalValue) {
@@ -164,7 +280,7 @@ class HealthController extends ChangeNotifier {
         anomalyDays.add(dayKey);
       }
     }
-    
+
     return anomalyDays.length;
   }
 

@@ -1,0 +1,17 @@
+{
+  "appTitle": "DALYS",
+  "dashboard": "Dashboard",
+  "alerts": "Alertes",
+  "suggestions": "Suggestions",
+  "chatbot": "Health Assistant",
+  "profile": "My Profile",
+  "share": "Share",
+  "login": "Login",
+  "register": "Register",
+  "logout": "Logout",
+  "medicalDisclaimer": "Warning: This application is a monitoring and prevention tool. It does not replace professional medical diagnosis. In case of emergency, contact emergency services.",
+  "generateReport": "Generate PDF Report",
+  "environmentalData": "Environmental Data",
+  "airQuality": "Air Quality",
+  "weather": "Weather"
+}

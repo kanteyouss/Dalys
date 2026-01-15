@@ -1,9 +1,4 @@
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
+// allprojects block removed to comply with Gradle 8.x repository management rules
 
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
