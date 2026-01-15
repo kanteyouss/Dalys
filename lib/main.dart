@@ -15,6 +15,7 @@ import 'features/alertes/widgets/emergency_countdown_overlay.dart';
 import 'data/services/auth_service.dart';
 import 'data/services/service_reconnaissance_vocale.dart';
 import 'data/services/service_vocal.dart';
+import 'data/models/modele_alerte.dart';
 
 // Note: If AppLocalizations is not generated yet, this might cause a lint error.
 // We keep it as it was in the original file.
@@ -120,8 +121,9 @@ class _MainWrapperState extends State<MainWrapper> {
           debugPrint('🎤 DÉCLENCHEMENT VOCAL D\'URGENCE : $declaredState');
 
           // Confirmation vocale immédiate pour rassurer l'utilisateur
-          ServiceVocal()
-              .parler("Alerte détectée. Lancement du protocole d'urgence.");
+          ServiceVocal().parler(
+              "Alerte détectée. Lancement du protocole d'urgence.",
+              niveau: NiveauNotification.urgence);
 
           EmergencyCountdownOverlay.show(context, user, declaredState);
         }

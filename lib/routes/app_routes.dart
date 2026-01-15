@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../features/health_monitoring/screens/health_dashboard.dart';
+import '../features/navigation/main_scaffold.dart';
 import '../features/alertes/screens/page_alertes.dart';
 import '../features/alertes/screens/page_detail_alerte.dart';
 import '../features/ai_suggestions/screens/ecran_suggestions.dart';
@@ -8,6 +9,8 @@ import '../features/data_sharing/screens/share_center.dart';
 import '../features/onboarding_auth/screens/login_page.dart';
 import '../features/onboarding_auth/screens/register_page.dart';
 import '../features/onboarding_auth/screens/profile_page.dart';
+import '../features/health_monitoring/screens/health_history_page.dart';
+import '../features/respiration/screens/ecran_respiration.dart';
 import '../data/models/modele_alerte.dart';
 
 class AppRoutes {
@@ -21,7 +24,9 @@ class AppRoutes {
   static const String connexion = '/connexion';
   static const String inscription = '/inscription';
   static const String profil = '/profil';
-  
+  static const String historique = '/historique';
+  static const String respiration = '/respiration';
+
   // Routes héritées (compatibilité)
   static const String dashboard = '/dashboard';
   static const String alerts = '/alerts';
@@ -33,7 +38,7 @@ class AppRoutes {
   static Map<String, WidgetBuilder> get routes {
     return {
       // Routes principales en français
-      tableauBord: (context) => const HealthDashboard(),
+      tableauBord: (context) => const MainScaffold(),
       alertes: (context) => const PageAlertes(),
       suggestions: (context) => const EcranSuggestions(),
       chatbot: (context) => const PageChatbot(),
@@ -41,9 +46,11 @@ class AppRoutes {
       connexion: (context) => const LoginPage(),
       inscription: (context) => const RegisterPage(),
       profil: (context) => const ProfilePage(),
-      
+      historique: (context) => const HealthHistoryPage(),
+      respiration: (context) => const EcranRespiration(),
+
       // Routes héritées (compatibilité)
-      dashboard: (context) => const HealthDashboard(),
+      dashboard: (context) => const MainScaffold(),
       alerts: (context) => const PageAlertes(),
       shareCenter: (context) => const ShareCenter(),
       login: (context) => const LoginPage(),
@@ -57,12 +64,12 @@ class AppRoutes {
       // Routes principales en français
       case tableauBord:
       case dashboard:
-        return MaterialPageRoute(builder: (context) => const HealthDashboard());
-        
+        return MaterialPageRoute(builder: (context) => const MainScaffold());
+
       case alertes:
       case alerts:
         return MaterialPageRoute(builder: (context) => const PageAlertes());
-        
+
       case detailAlerte:
         // Route paramétrique pour les détails d'alerte
         if (settings.arguments is ModeleAlerte) {
@@ -72,29 +79,38 @@ class AppRoutes {
           );
         }
         return _routeErreur('Paramètre d\'alerte manquant');
-        
+
       case suggestions:
-        return MaterialPageRoute(builder: (context) => const EcranSuggestions());
-        
+        return MaterialPageRoute(
+            builder: (context) => const EcranSuggestions());
+
       case chatbot:
         return MaterialPageRoute(builder: (context) => const PageChatbot());
-        
+
       case centrePartage:
       case shareCenter:
         return MaterialPageRoute(builder: (context) => const ShareCenter());
-        
+
       case connexion:
       case login:
         return MaterialPageRoute(builder: (context) => const LoginPage());
-        
+
       case inscription:
       case register:
         return MaterialPageRoute(builder: (context) => const RegisterPage());
-        
+
       case profil:
       case profile:
         return MaterialPageRoute(builder: (context) => const ProfilePage());
-        
+
+      case historique:
+        return MaterialPageRoute(
+            builder: (context) => const HealthHistoryPage());
+
+      case respiration:
+        return MaterialPageRoute(
+            builder: (context) => const EcranRespiration());
+
       default:
         return _routeErreur('Page introuvable');
     }
@@ -126,7 +142,8 @@ class AppRoutes {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () => Navigator.of(context).pushReplacementNamed(tableauBord),
+                onPressed: () =>
+                    Navigator.of(context).pushReplacementNamed(tableauBord),
                 child: const Text('Retour au tableau de bord'),
               ),
             ],

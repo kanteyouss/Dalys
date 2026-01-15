@@ -5,6 +5,8 @@ import 'package:dalys/features/alertes/services/service_ia.dart';
 import 'package:dalys/features/alertes/services/service_environnemental.dart';
 import 'package:dalys/features/alertes/services/service_historique_alertes.dart';
 import 'package:dalys/features/alertes/services/service_notifications.dart';
+import 'package:dalys/data/services/service_vocal.dart';
+import 'package:dalys/data/services/service_chatbot.dart';
 
 /// Provider principal pour la gestion complète du système d'alertes
 /// Coordonne tous les services : IA, environnemental, historique, notifications
@@ -12,22 +14,24 @@ class AlertesProvider extends ChangeNotifier {
   /// Services
   final ServiceIA _serviceIA = ServiceIA();
   final ServiceEnvironnemental _serviceEnv = ServiceEnvironnemental();
-  final ServiceHistoriqueAlertes _serviceHistorique = ServiceHistoriqueAlertes();
+  final ServiceHistoriqueAlertes _serviceHistorique =
+      ServiceHistoriqueAlertes();
   final ServiceNotifications _serviceNotifications = ServiceNotifications();
+  final ServiceVocal _serviceVocal = ServiceVocal();
 
   /// État général
   List<ModeleAlerte> _alertesActives = [];
   bool _chargementEnCours = false;
   String? _erreurChargement;
-  
+
   /// État historique
   List<ModeleAlerte> _historiqueComplet = [];
   List<ModeleAlerte> _historiqueFiltre = [];
   Map<String, dynamic> _statistiquesHistorique = {};
-  
+
   /// Filtres actifs
   Map<String, dynamic> _filtresActifs = {};
-  
+
   /// Configuration
   bool _alertesIAActivees = true;
   bool _alertesEnvironnementalesActivees = true;
@@ -40,15 +44,19 @@ class AlertesProvider extends ChangeNotifier {
 
   /// Getters
   List<ModeleAlerte> get alertesActives => List.unmodifiable(_alertesActives);
-  List<ModeleAlerte> get historiqueComplet => List.unmodifiable(_historiqueComplet);
-  List<ModeleAlerte> get historiqueFiltre => List.unmodifiable(_historiqueFiltre);
-  Map<String, dynamic> get statistiquesHistorique => Map.from(_statistiquesHistorique);
+  List<ModeleAlerte> get historiqueComplet =>
+      List.unmodifiable(_historiqueComplet);
+  List<ModeleAlerte> get historiqueFiltre =>
+      List.unmodifiable(_historiqueFiltre);
+  Map<String, dynamic> get statistiquesHistorique =>
+      Map.from(_statistiquesHistorique);
   Map<String, dynamic> get filtresActifs => Map.from(_filtresActifs);
-  
+
   bool get chargementEnCours => _chargementEnCours;
   String? get erreurChargement => _erreurChargement;
   bool get alertesIAActivees => _alertesIAActivees;
-  bool get alertesEnvironnementalesActivees => _alertesEnvironnementalesActivees;
+  bool get alertesEnvironnementalesActivees =>
+      _alertesEnvironnementalesActivees;
   bool get notificationsActivees => _notificationsActivees;
   bool get modeSimulation => _modeSimulation;
   int get intervalleMAJ => _intervalleMAJ;
@@ -61,23 +69,23 @@ class AlertesProvider extends ChangeNotifier {
   /// Initialisation du provider
   Future<void> _initialiser() async {
     debugPrint('🚀 Initialisation du système d\'alertes...');
-    
+
     // Configurer les services
     _serviceIA.configurerModeSimulation(_modeSimulation);
     _serviceEnv.configurerModeSimulation(_modeSimulation);
-    
+
     // Initialiser les notifications
     await _serviceNotifications.initialiser();
-    
+
     // Charger l'historique
     await chargerHistorique();
-    
+
     // Démarrer les alertes actives
     await actualiserAlertesActives();
-    
+
     // Démarrer la mise à jour automatique
     demarrerMiseAJourAutomatique();
-    
+
     debugPrint('✅ Système d\'alertes initialisé');
   }
 
@@ -87,10 +95,9 @@ class AlertesProvider extends ChangeNotifier {
       _historiqueComplet = await _serviceHistorique.obtenirHistorique();
       _historiqueFiltre = List.from(_historiqueComplet);
       _statistiquesHistorique = await _serviceHistorique.obtenirStatistiques();
-      
+
       debugPrint('📖 Historique chargé: ${_historiqueComplet.length} alertes');
       notifyListeners();
-      
     } catch (erreur) {
       debugPrint('❌ Erreur chargement historique: $erreur');
       _erreurChargement = 'Erreur lors du chargement de l\'historique';
@@ -101,14 +108,14 @@ class AlertesProvider extends ChangeNotifier {
   /// Actualise les alertes actives (IA + Environnementales)
   Future<void> actualiserAlertesActives() async {
     if (_chargementEnCours) return;
-    
+
     _chargementEnCours = true;
     _erreurChargement = null;
     notifyListeners();
 
     try {
       final nouvellesAlertes = <ModeleAlerte>[];
-      
+
       // Récupérer les alertes IA si activées
       if (_alertesIAActivees) {
         try {
@@ -119,37 +126,39 @@ class AlertesProvider extends ChangeNotifier {
           debugPrint('⚠️ Erreur alertes IA: $erreur');
         }
       }
-      
+
       // Récupérer les alertes environnementales si activées
       if (_alertesEnvironnementalesActivees) {
         try {
-          final alertesEnv = await _serviceEnv.obtenirAlertesEnvironnementales();
+          final alertesEnv =
+              await _serviceEnv.obtenirAlertesEnvironnementales();
           nouvellesAlertes.addAll(alertesEnv);
-          debugPrint('🌍 ${alertesEnv.length} alertes environnementales récupérées');
+          debugPrint(
+              '🌍 ${alertesEnv.length} alertes environnementales récupérées');
         } catch (erreur) {
           debugPrint('⚠️ Erreur alertes environnementales: $erreur');
         }
       }
-      
+
       // Mettre à jour la liste des alertes actives
       _alertesActives = nouvellesAlertes;
-      
+
       // Trier par priorité
-      _alertesActives.sort((a, b) => b.niveauPriorite.compareTo(a.niveauPriorite));
-      
+      _alertesActives
+          .sort((a, b) => b.niveauPriorite.compareTo(a.niveauPriorite));
+
       // Sauvegarder dans l'historique
       if (nouvellesAlertes.isNotEmpty) {
         await _serviceHistorique.sauvegarderAlertes(nouvellesAlertes);
         await chargerHistorique(); // Recharger pour mettre à jour
       }
-      
+
       // Envoyer les notifications
       if (_notificationsActivees) {
         await _envoyerNotificationsAlertes(nouvellesAlertes);
       }
-      
+
       debugPrint('✅ ${nouvellesAlertes.length} alertes actives mises à jour');
-      
     } catch (erreur) {
       debugPrint('❌ Erreur actualisation alertes: $erreur');
       _erreurChargement = 'Erreur lors de l\'actualisation des alertes';
@@ -169,36 +178,88 @@ class AlertesProvider extends ChangeNotifier {
       'temperature': 36.8,
       'timestamp': DateTime.now().toIso8601String(),
     };
-    
+
     // Ajouter des données environnementales si disponibles
     final donneesEnv = _serviceEnv.dernieresdonneesEnvironnementales;
-    
+
     return await _serviceIA.obtenirPredictionsRisque(
       donneesPatient: donneesPatient,
       donneesEnvironnementales: donneesEnv,
     );
   }
 
-  /// Envoie des notifications pour les nouvelles alertes
+  /// Envoie des notifications pour les nouvelles alertes (écrites et vocales)
   Future<void> _envoyerNotificationsAlertes(List<ModeleAlerte> alertes) async {
     for (final alerte in alertes) {
-      // Notification locale
-      await _serviceNotifications.afficherNotificationLocale(
-        id: alerte.id.hashCode,
-        titre: alerte.titre,
-        message: alerte.description,
-        donnees: alerte.toJson(),
-      );
-      
-      // Notification push pour les alertes critiques
-      if (alerte.niveauPriorite >= 90) {
-        await _serviceNotifications.envoyerNotificationPush(
-          destinataire: 'user_local',
-          titre: '🚨 ${alerte.titre}',
-          message: alerte.description,
-          donnees: alerte.toJson(),
+      // 1. Notification écrite (système)
+      if (alerte.niveauNotification == NiveauNotification.urgence) {
+        await _serviceNotifications.afficherNotificationCritique(alerte);
+      } else {
+        await _serviceNotifications.afficherNotificationPourAlerte(alerte);
+      }
+
+      // 2. Notification vocale (proactive ou critique)
+      if (alerte.niveauNotification == NiveauNotification.urgence ||
+          alerte.niveauNotification == NiveauNotification.prevention) {
+        String prefixe = alerte.niveauNotification == NiveauNotification.urgence
+            ? "Alerte urgente. "
+            : "Conseil de prévention. ";
+
+        await _serviceVocal.parler(
+          "$prefixe ${alerte.titre}. ${alerte.description}",
+          niveau: alerte.niveauNotification,
         );
       }
+
+      // 3. Notification push pour les alertes critiques (optionnel, déjà géré par afficherNotificationCritique en local)
+      if (alerte.niveauPriorite >= 90) {
+        debugPrint(
+            '🚀 Notification push simulée pour alerte critique: ${alerte.titre}');
+      }
+
+      // 4. Check-in proactif du Chatbot pour les alertes environnementales
+      if (alerte.type == TypeAlerte.environnementale ||
+          alerte.tags.contains('environnement')) {
+        await _gererCheckInChatbot(alerte);
+      }
+    }
+  }
+
+  /// Gère le déclenchement d'un check-in proactif du chatbot
+  Future<void> _gererCheckInChatbot(ModeleAlerte alerte) async {
+    String message = "";
+    List<String> suggestions = ['Ça va', 'Un peu gêné', 'Besoin d\'aide'];
+
+    if (alerte.tags.contains('pollen')) {
+      message =
+          "Bonjour, le taux de pollen est très élevé aujourd'hui (${alerte.titre}). Ressentez-vous des picotements ou une gêne respiratoire particulière ?";
+      suggestions = [
+        'Pas de gêne',
+        'Yeux qui piquent',
+        'Nez bouché',
+        'Essoufflement'
+      ];
+    } else if (alerte.tags.contains('pollution') ||
+        alerte.tags.contains('aqi')) {
+      message =
+          "Attention, la qualité de l'air est dégradée actuellement. Comment vous sentez-vous ? Avez-vous remarqué une augmentation de votre toux ou de votre essoufflement ?";
+      suggestions = ['Tout va bien', 'Toux grasse', 'Essoufflement', 'Fatigue'];
+    } else {
+      // Message générique pour les autres alertes environnementales
+      message =
+          "Une alerte environnementale a été détectée : ${alerte.titre}. Est-ce que cela impacte votre confort respiratoire ?";
+    }
+
+    if (message.isNotEmpty) {
+      // 1. Sauvegarder dans l'historique du chat
+      await ServiceChatbot().envoyerMessageProactif(
+        message,
+        quickReplies: suggestions,
+      );
+
+      // 2. Annonce vocale de la question du chatbot (ton calme de prévention)
+      await _serviceVocal.parler(message,
+          niveau: NiveauNotification.prevention);
     }
   }
 
@@ -221,7 +282,7 @@ class AlertesProvider extends ChangeNotifier {
       'recherche': recherche,
       'limite': limite,
     };
-    
+
     _historiqueFiltre = await _serviceHistorique.filtrerHistorique(
       types: types,
       niveauPrioriteMin: niveauPrioriteMin,
@@ -231,7 +292,7 @@ class AlertesProvider extends ChangeNotifier {
       recherche: recherche,
       limite: limite,
     );
-    
+
     debugPrint('🔍 Filtre appliqué: ${_historiqueFiltre.length} alertes');
     notifyListeners();
   }
@@ -248,17 +309,18 @@ class AlertesProvider extends ChangeNotifier {
   Future<void> acquitterAlerte(String alerteId) async {
     // Supprimer des alertes actives
     _alertesActives.removeWhere((alerte) => alerte.id == alerteId);
-    
+
     // Mettre à jour dans l'historique
-    final index = _historiqueComplet.indexWhere((alerte) => alerte.id == alerteId);
+    final index =
+        _historiqueComplet.indexWhere((alerte) => alerte.id == alerteId);
     if (index != -1) {
       _historiqueComplet[index].mettreAJourStatut(StatutAlerte.resolue);
       await _serviceHistorique.sauvegarderAlerte(_historiqueComplet[index]);
     }
-    
+
     // Annuler la notification
     await _serviceNotifications.annulerNotificationLocale(alerteId.hashCode);
-    
+
     debugPrint('✅ Alerte acquittée: $alerteId');
     notifyListeners();
   }
@@ -270,10 +332,10 @@ class AlertesProvider extends ChangeNotifier {
       _historiqueComplet.removeWhere((alerte) => alerte.id == alerteId);
       _historiqueFiltre.removeWhere((alerte) => alerte.id == alerteId);
       _alertesActives.removeWhere((alerte) => alerte.id == alerteId);
-      
+
       // Mettre à jour les statistiques
       _statistiquesHistorique = await _serviceHistorique.obtenirStatistiques();
-      
+
       debugPrint('🗑️ Alerte supprimée: $alerteId');
       notifyListeners();
     }
@@ -286,7 +348,7 @@ class AlertesProvider extends ChangeNotifier {
       _historiqueComplet.clear();
       _historiqueFiltre.clear();
       _statistiquesHistorique.clear();
-      
+
       debugPrint('🗑️ Historique vidé');
       notifyListeners();
     }
@@ -299,10 +361,11 @@ class AlertesProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Configuration des alertes environnementales  
+  /// Configuration des alertes environnementales
   void configurerAlertesEnvironnementales(bool actives) {
     _alertesEnvironnementalesActivees = actives;
-    debugPrint('⚙️ Alertes environnementales: ${actives ? 'activées' : 'désactivées'}');
+    debugPrint(
+        '⚙️ Alertes environnementales: ${actives ? 'activées' : 'désactivées'}');
     notifyListeners();
   }
 
@@ -326,13 +389,13 @@ class AlertesProvider extends ChangeNotifier {
   void configurerIntervalleMAJ(int minutes) {
     if (minutes < 5) minutes = 5;
     if (minutes > 60) minutes = 60;
-    
+
     _intervalleMAJ = minutes;
-    
+
     if (_timerMAJ?.isActive ?? false) {
       demarrerMiseAJourAutomatique(); // Redémarrer avec nouvel intervalle
     }
-    
+
     debugPrint('⚙️ Intervalle MAJ: ${_intervalleMAJ}min');
     notifyListeners();
   }
@@ -368,12 +431,12 @@ class AlertesProvider extends ChangeNotifier {
       'moyenne': 0,
       'faible': 0,
     };
-    
+
     for (final alerte in _alertesActives) {
       // Par type
       final typeKey = alerte.type.toString().split('.').last;
       alertesParType[typeKey] = (alertesParType[typeKey] ?? 0) + 1;
-      
+
       // Par priorité
       if (alerte.niveauPriorite >= 90) {
         alertesParPriorite['critique'] = alertesParPriorite['critique']! + 1;
@@ -385,7 +448,7 @@ class AlertesProvider extends ChangeNotifier {
         alertesParPriorite['faible'] = alertesParPriorite['faible']! + 1;
       }
     }
-    
+
     return {
       'alertes_actives': _alertesActives.length,
       'historique_total': _historiqueComplet.length,

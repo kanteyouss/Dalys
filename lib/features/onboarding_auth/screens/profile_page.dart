@@ -19,6 +19,8 @@ class _ProfilePageState extends State<ProfilePage> {
   late TextEditingController _emergencyNameController;
   late TextEditingController _emergencyPhoneController;
   late TextEditingController _emergencyEmailController;
+  late TextEditingController _doctorEmailController;
+  late TextEditingController _hospitalEmailController;
   final _passwordController = TextEditingController();
 
   bool _isEditing = false;
@@ -39,6 +41,10 @@ class _ProfilePageState extends State<ProfilePage> {
         TextEditingController(text: user?.emergencyContactPhone ?? '');
     _emergencyEmailController =
         TextEditingController(text: user?.emergencyContactEmail ?? '');
+    _doctorEmailController =
+        TextEditingController(text: user?.doctorEmail ?? '');
+    _hospitalEmailController =
+        TextEditingController(text: user?.hospitalEmail ?? '');
   }
 
   @override
@@ -50,6 +56,8 @@ class _ProfilePageState extends State<ProfilePage> {
     _emergencyNameController.dispose();
     _emergencyPhoneController.dispose();
     _emergencyEmailController.dispose();
+    _doctorEmailController.dispose();
+    _hospitalEmailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -76,6 +84,12 @@ class _ProfilePageState extends State<ProfilePage> {
       emergencyContactEmail: _emergencyEmailController.text.trim().isEmpty
           ? null
           : _emergencyEmailController.text.trim(),
+      doctorEmail: _doctorEmailController.text.trim().isEmpty
+          ? null
+          : _doctorEmailController.text.trim(),
+      hospitalEmail: _hospitalEmailController.text.trim().isEmpty
+          ? null
+          : _hospitalEmailController.text.trim(),
       // Si le mot de passe est vide, on garde l'ancien (haché)
       password: _passwordController.text.isEmpty
           ? currentUser.password
@@ -209,6 +223,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         u?.emergencyContactPhone ?? '';
                     _emergencyEmailController.text =
                         u?.emergencyContactEmail ?? '';
+                    _doctorEmailController.text = u?.doctorEmail ?? '';
+                    _hospitalEmailController.text = u?.hospitalEmail ?? '';
                     _passwordController.clear();
                   }
                 }),
@@ -283,6 +299,24 @@ class _ProfilePageState extends State<ProfilePage> {
                         icon: Icons.email_outlined,
                         enabled: _isEditing,
                         keyboardType: TextInputType.emailAddress,
+                      ),
+                      const Divider(height: 32),
+                      _buildTextField(
+                        controller: _doctorEmailController,
+                        label: 'Email du médecin traitant',
+                        icon: Icons.medical_services_outlined,
+                        enabled: _isEditing,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) => null, // Optionnel
+                      ),
+                      const Divider(height: 32),
+                      _buildTextField(
+                        controller: _hospitalEmailController,
+                        label: 'Email de l\'hôpital',
+                        icon: Icons.local_hospital_outlined,
+                        enabled: _isEditing,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) => null, // Optionnel
                       ),
                     ]),
                     const SizedBox(height: 24),
@@ -453,6 +487,7 @@ class _ProfilePageState extends State<ProfilePage> {
     bool enabled = true,
     TextInputType? keyboardType,
     String? helperText,
+    String? Function(String?)? validator,
     Widget? suffixIcon,
   }) {
     return TextFormField(
@@ -474,7 +509,8 @@ class _ProfilePageState extends State<ProfilePage> {
         fontSize: 16,
         color: enabled ? null : Colors.grey.shade600,
       ),
-      validator: (value) => value == null || value.isEmpty ? 'Requis' : null,
+      validator: validator ??
+          (value) => value == null || value.isEmpty ? 'Requis' : null,
     );
   }
 }

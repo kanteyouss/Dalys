@@ -28,6 +28,7 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
     'Congestion nasale',
     'Oppression thoracique',
   ];
+  bool _showSymptoms = false;
 
   @override
   void dispose() {
@@ -136,36 +137,53 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
 
                 const SizedBox(height: 24),
 
-                // Symptômes
-                _buildSectionTitle(context, 'Symptômes (optionnel)'),
-                const SizedBox(height: 12),
-
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _availableSymptoms.map((symptom) {
-                    final isSelected = _selectedSymptoms.contains(symptom);
-                    return FilterChip(
-                      label: Text(symptom),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        HapticFeedback.selectionClick();
-                        setState(() {
-                          if (selected) {
-                            _selectedSymptoms.add(symptom);
-                          } else {
-                            _selectedSymptoms.remove(symptom);
-                          }
-                        });
-                      },
-                      selectedColor:
-                          Theme.of(context).primaryColor.withOpacity(0.2),
-                      checkmarkColor: Theme.of(context).primaryColor,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                    );
-                  }).toList(),
+                // Symptômes (Progressive Disclosure)
+                InkWell(
+                  onTap: () => setState(() => _showSymptoms = !_showSymptoms),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        _buildSectionTitle(context, 'Symptômes (optionnel)'),
+                        const Spacer(),
+                        Icon(
+                          _showSymptoms ? Icons.expand_less : Icons.expand_more,
+                          color: Colors.grey,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+                if (_showSymptoms) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _availableSymptoms.map((symptom) {
+                      final isSelected = _selectedSymptoms.contains(symptom);
+                      return FilterChip(
+                        label:
+                            Text(symptom, style: const TextStyle(fontSize: 13)),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            if (selected) {
+                              _selectedSymptoms.add(symptom);
+                            } else {
+                              _selectedSymptoms.remove(symptom);
+                            }
+                          });
+                        },
+                        selectedColor:
+                            Theme.of(context).primaryColor.withOpacity(0.2),
+                        checkmarkColor: Theme.of(context).primaryColor,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                      );
+                    }).toList(),
+                  ),
+                ],
 
                 const SizedBox(height: 32),
 

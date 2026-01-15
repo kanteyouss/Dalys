@@ -11,15 +11,17 @@ import 'service_geolocalisation.dart';
 /// Intègre la géolocalisation pour un fuseau horaire précis (Côte d'Ivoire)
 class ServiceNotifications {
   /// Instance singleton du service
-  static final ServiceNotifications _instance = ServiceNotifications._internal();
+  static final ServiceNotifications _instance =
+      ServiceNotifications._internal();
   factory ServiceNotifications() => _instance;
   ServiceNotifications._internal();
 
   /// Service de géolocalisation pour le fuseau horaire
-  final ServiceGeolocalisation _serviceGeolocalisation = ServiceGeolocalisation();
+  final ServiceGeolocalisation _serviceGeolocalisation =
+      ServiceGeolocalisation();
 
   /// Plugin principal pour les notifications
-  final FlutterLocalNotificationsPlugin _pluginNotifications = 
+  final FlutterLocalNotificationsPlugin _pluginNotifications =
       FlutterLocalNotificationsPlugin();
 
   /// État d'initialisation du service
@@ -41,7 +43,7 @@ class ServiceNotifications {
     try {
       // Initialiser les fuseaux horaires
       tz.initializeTimeZones();
-      
+
       // Initialiser le service de géolocalisation
       await _serviceGeolocalisation.initialiser();
 
@@ -85,10 +87,11 @@ class ServiceNotifications {
 
       // Créer les canaux de notification
       await _creerCanauxNotification();
-      
+
       // Demander les permissions - vérifier que le context est encore valide
       final contextMonte = context?.mounted ?? false;
-      final permissionsAccordees = await _demanderPermissions(contextMonte ? context : null);
+      final permissionsAccordees =
+          await _demanderPermissions(contextMonte ? context : null);
       if (!permissionsAccordees) {
         debugPrint('⚠️ Permissions notifications limitées');
       }
@@ -96,7 +99,6 @@ class ServiceNotifications {
       _estInitialise = true;
       debugPrint('✅ Service notifications initialisé');
       return true;
-
     } catch (erreur) {
       debugPrint('❌ Erreur initialisation notifications: $erreur');
       return false;
@@ -108,30 +110,28 @@ class ServiceNotifications {
     try {
       // Permission de base pour les notifications
       final statutNotifications = await Permission.notification.request();
-      
+
       // Demander la géolocalisation avec dialog explicatif si contexte disponible
       bool geolocalisationAccordee = true;
       if (context != null && context.mounted) {
-        geolocalisationAccordee = await _serviceGeolocalisation
-            .demanderPermissionAvecDialog(context);
+        geolocalisationAccordee =
+            await _serviceGeolocalisation.demanderPermissionAvecDialog(context);
       }
 
       // Permissions spécifiques Android - utiliser détection de plateforme directe
       if (Platform.isAndroid) {
-        
         // Permission pour les notifications exactes (Android 12+)
         final statutAlarmes = await Permission.scheduleExactAlarm.request();
-        
+
         // Permission pour ignorer l'optimisation de batterie
         await Permission.ignoreBatteryOptimizations.request();
-        
-        return statutNotifications.isGranted && 
-               statutAlarmes.isGranted && 
-               geolocalisationAccordee;
+
+        return statutNotifications.isGranted &&
+            statutAlarmes.isGranted &&
+            geolocalisationAccordee;
       }
 
       return statutNotifications.isGranted && geolocalisationAccordee;
-
     } catch (erreur) {
       debugPrint('❌ Erreur demande permissions: $erreur');
       return false;
@@ -153,7 +153,18 @@ class ServiceNotifications {
         enableLights: true,
         ledColor: Colors.red,
       ),
-      
+
+      // Canal pour la prévention (proactif)
+      const AndroidNotificationChannel(
+        'canal_prevention',
+        'Prévention & Conseils',
+        description: 'Notifications proactives pour anticiper les risques',
+        importance: Importance.low,
+        playSound: false,
+        enableVibration: false,
+        showBadge: true,
+      ),
+
       // Canal pour alertes importantes
       const AndroidNotificationChannel(
         'canal_alertes',
@@ -164,7 +175,7 @@ class ServiceNotifications {
         enableVibration: true,
         showBadge: true,
       ),
-      
+
       // Canal pour rappels médicaments
       const AndroidNotificationChannel(
         'canal_medicaments',
@@ -176,7 +187,7 @@ class ServiceNotifications {
         showBadge: true,
         ledColor: Colors.green,
       ),
-      
+
       // Canal pour rendez-vous
       const AndroidNotificationChannel(
         'canal_rendezvous',
@@ -210,10 +221,9 @@ class ServiceNotifications {
 
     try {
       final idNotification = _obtenirIdNotification();
-      
+
       // Pour les alertes non critiques, afficher sous forme de "message" (messaging style)
-      if (alerte.type != TypeAlerte.critique &&
-          Platform.isAndroid) {
+      if (alerte.type != TypeAlerte.critique && Platform.isAndroid) {
         // Utiliser MessagingStyleInformation pour un rendu conversationnel
         final personneApp = Person(
           name: 'E-Santé 4.0',
@@ -253,7 +263,8 @@ class ServiceNotifications {
           idNotification,
           _formaterTitreNotification(alerte),
           _formaterMessageNotification(alerte),
-          NotificationDetails(android: detailsAndroid, iOS: detailsiOS, macOS: detailsiOS),
+          NotificationDetails(
+              android: detailsAndroid, iOS: detailsiOS, macOS: detailsiOS),
           payload: alerte.id,
         );
 
@@ -262,7 +273,7 @@ class ServiceNotifications {
         // Comportement par défaut (critique ou plateformes non-Android)
         final detailsAndroid = _configurerDetailsAndroid(alerte);
         final detailsiOS = _configurerDetailsIOS(alerte);
-        
+
         final detailsNotification = NotificationDetails(
           android: detailsAndroid,
           iOS: detailsiOS,
@@ -280,7 +291,6 @@ class ServiceNotifications {
 
         debugPrint('📱 Notification affichée: ${alerte.titre}');
       }
-
     } catch (erreur) {
       debugPrint('❌ Erreur affichage notification: $erreur');
     }
@@ -292,12 +302,13 @@ class ServiceNotifications {
 
     try {
       final idNotification = _obtenirIdNotification();
-      
+
       // Configuration spéciale pour alertes critiques
       final detailsAndroid = AndroidNotificationDetails(
         'canal_critique',
         'Alertes Critiques',
-        channelDescription: 'Urgences médicales nécessitant une attention immédiate',
+        channelDescription:
+            'Urgences médicales nécessitant une attention immédiate',
         importance: Importance.max,
         priority: Priority.high,
         showWhen: true,
@@ -351,7 +362,6 @@ class ServiceNotifications {
       );
 
       debugPrint('🚨 Notification critique affichée: ${alerte.titre}');
-
     } catch (erreur) {
       debugPrint('❌ Erreur notification critique: $erreur');
     }
@@ -367,13 +377,14 @@ class ServiceNotifications {
 
     try {
       final idNotification = _obtenirIdNotification();
-      
+
       // Obtenir le fuseau horaire local approprié
       final fuseauLocal = await _obtenirFuseauHoraireLocal();
-      
+
       // Convertir la date au fuseau local
-      final dateLocaleProgrammee = tz.TZDateTime.from(dateProgrammee, fuseauLocal);
-      
+      final dateLocaleProgrammee =
+          tz.TZDateTime.from(dateProgrammee, fuseauLocal);
+
       debugPrint('⏰ Programmation notification:');
       debugPrint('  - Date demandée: $dateProgrammee');
       debugPrint('  - Fuseau détecté: ${fuseauLocal.name}');
@@ -400,8 +411,8 @@ class ServiceNotifications {
         payload: alerte.id,
       );
 
-      debugPrint('📅 Notification programmée: ${alerte.titre} à $dateLocaleProgrammee');
-
+      debugPrint(
+          '📅 Notification programmée: ${alerte.titre} à $dateLocaleProgrammee');
     } catch (erreur) {
       debugPrint('❌ Erreur programmation notification: $erreur');
     }
@@ -416,7 +427,7 @@ class ServiceNotifications {
 
     try {
       final idNotification = _obtenirIdNotification();
-      
+
       final detailsAndroid = _configurerDetailsAndroid(alerte);
       final detailsiOS = _configurerDetailsIOS(alerte);
 
@@ -434,7 +445,6 @@ class ServiceNotifications {
       );
 
       debugPrint('🔄 Notification récurrente programmée: ${alerte.titre}');
-
     } catch (erreur) {
       debugPrint('❌ Erreur notification récurrente: $erreur');
     }
@@ -466,17 +476,21 @@ class ServiceNotifications {
   AndroidNotificationDetails _configurerDetailsAndroid(ModeleAlerte alerte) {
     final canalId = _obtenirCanalId(alerte);
     final canalNom = _obtenirNomCanal(alerte);
-    
+
     return AndroidNotificationDetails(
       canalId,
       canalNom,
       channelDescription: _obtenirDescriptionCanal(alerte),
-      importance: alerte.type == TypeAlerte.critique 
-          ? Importance.max 
-          : Importance.high,
-      priority: alerte.type == TypeAlerte.critique 
-          ? Priority.high 
-          : Priority.defaultPriority,
+      importance: alerte.niveauNotification == NiveauNotification.urgence
+          ? Importance.max
+          : (alerte.niveauNotification == NiveauNotification.prevention
+              ? Importance.low
+              : Importance.high),
+      priority: alerte.niveauNotification == NiveauNotification.urgence
+          ? Priority.high
+          : (alerte.niveauNotification == NiveauNotification.prevention
+              ? Priority.low
+              : Priority.defaultPriority),
       showWhen: true,
       when: alerte.dateCreation.millisecondsSinceEpoch,
       color: _obtenirCouleurNotification(alerte),
@@ -532,11 +546,16 @@ class ServiceNotifications {
     return alerte.description;
   }
 
-  /// Obtient l'ID du canal selon le type d'alerte
+  /// Obtient l'ID du canal selon le type d'alerte et le niveau de notification
   String _obtenirCanalId(ModeleAlerte alerte) {
+    if (alerte.niveauNotification == NiveauNotification.urgence) {
+      return 'canal_critique';
+    }
+    if (alerte.niveauNotification == NiveauNotification.prevention) {
+      return 'canal_prevention';
+    }
+
     switch (alerte.type) {
-      case TypeAlerte.critique:
-        return 'canal_critique';
       case TypeAlerte.medicament:
         return 'canal_medicaments';
       case TypeAlerte.rendezvous:
@@ -548,9 +567,14 @@ class ServiceNotifications {
 
   /// Obtient le nom du canal selon le type d'alerte
   String _obtenirNomCanal(ModeleAlerte alerte) {
+    if (alerte.niveauNotification == NiveauNotification.urgence) {
+      return 'Alertes Critiques';
+    }
+    if (alerte.niveauNotification == NiveauNotification.prevention) {
+      return 'Prévention & Conseils';
+    }
+
     switch (alerte.type) {
-      case TypeAlerte.critique:
-        return 'Alertes Critiques';
       case TypeAlerte.medicament:
         return 'Rappels Médicaments';
       case TypeAlerte.rendezvous:
@@ -645,7 +669,7 @@ class ServiceNotifications {
     final payload = response.payload;
     if (payload != null) {
       debugPrint('👆 Action notification: $payload');
-      
+
       // Navigation vers l'alerte concernée
       _naviguerVersAlerte(payload);
     }
@@ -662,11 +686,12 @@ class ServiceNotifications {
   }
 
   /// Informations et diagnostics
-  
+
   /// Obtient les informations sur l'état du service
   Future<Map<String, dynamic>> obtenirInformationsService() async {
-    final infosGeo = await _serviceGeolocalisation.obtenirInformationsLocalisation();
-    
+    final infosGeo =
+        await _serviceGeolocalisation.obtenirInformationsLocalisation();
+
     return {
       'initialise': _estInitialise,
       'prochain_id_notification': _prochainIdNotification,
@@ -682,7 +707,8 @@ class ServiceNotifications {
       'notifications': await Permission.notification.isGranted,
       'geolocalisation': await Permission.location.isGranted,
       'alarmes_exactes': await Permission.scheduleExactAlarm.isGranted,
-      'batterie_optimisee': await Permission.ignoreBatteryOptimizations.isGranted,
+      'batterie_optimisee':
+          await Permission.ignoreBatteryOptimizations.isGranted,
     };
   }
 
@@ -732,7 +758,7 @@ class ServiceNotifications {
   }) async {
     // TODO: Implémenter l'envoi de notifications push via Firebase ou autre
     debugPrint('📱 Notification push envoyée à $destinataire: $titre');
-    
+
     // Pour l'instant, utiliser une notification locale comme fallback
     await afficherNotificationLocale(
       id: titre.hashCode,
@@ -753,8 +779,9 @@ class ServiceNotifications {
     try {
       final infos = await obtenirInformationsService();
       final initialise = infos['initialise'] as bool? ?? false;
-      final permissions = infos['permissions_accordees'] as Map<String, bool>? ?? {};
-      
+      final permissions =
+          infos['permissions_accordees'] as Map<String, bool>? ?? {};
+
       return initialise && (permissions['notifications'] ?? false);
     } catch (erreur) {
       debugPrint('❌ Test connectivité notifications: $erreur');
@@ -766,7 +793,7 @@ class ServiceNotifications {
 /// Service de navigation global (à implémenter selon l'architecture)
 class NavigationService {
   static GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  
+
   static void navigateTo(String route) {
     navigatorKey.currentState?.pushNamed(route);
   }

@@ -20,7 +20,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 6, // Augmentation pour emergency_contact_email
+      version: 7, // Augmentation pour doctor_email et hospital_email
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -78,6 +78,10 @@ class DatabaseService {
       await db
           .execute('ALTER TABLE users ADD COLUMN emergency_contact_email TEXT');
     }
+    if (oldVersion < 7) {
+      await db.execute('ALTER TABLE users ADD COLUMN doctor_email TEXT');
+      await db.execute('ALTER TABLE users ADD COLUMN hospital_email TEXT');
+    }
   }
 
   Future<void> _createUserTable(Database db) async {
@@ -91,7 +95,9 @@ class DatabaseService {
         telephone TEXT,
         emergency_contact_name TEXT,
         emergency_contact_phone TEXT,
-        emergency_contact_email TEXT
+        emergency_contact_email TEXT,
+        doctor_email TEXT,
+        hospital_email TEXT
       )
     ''');
   }

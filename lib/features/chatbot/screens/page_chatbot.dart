@@ -6,6 +6,7 @@ import '../../../../data/models/message_chatbot.dart';
 import '../../../../data/models/health_data.dart';
 import '../../../../data/services/service_chatbot.dart';
 import '../../../../data/services/service_vocal.dart';
+import '../../../../data/models/modele_alerte.dart';
 import '../../health_monitoring/controllers/health_controller.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/typing_indicator.dart';
@@ -101,12 +102,13 @@ class _PageChatbotState extends State<PageChatbot> {
         _scrollToBottom();
 
         if (reponse.text.length < 200) {
-          _serviceVocal.parler(reponse.text);
+          _serviceVocal.parler(reponse.text,
+              niveau: NiveauNotification.prevention);
         }
       }
     } catch (e) {
       if (mounted) {
-        HapticFeedback.errorHighlight;
+        HapticFeedback.vibrate();
         setState(() {
           _isTyping = false;
           _messages.add(MessageChatbot.assistant(
@@ -201,8 +203,8 @@ class _PageChatbotState extends State<PageChatbot> {
           ),
           if (_suggestions.isNotEmpty)
             Container(
-              height: 60,
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              height: 50,
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -211,94 +213,83 @@ class _PageChatbotState extends State<PageChatbot> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ActionChip(
-                      label: Text(_suggestions[index]),
+                      label: Text(_suggestions[index],
+                          style: const TextStyle(fontSize: 13)),
                       onPressed: () =>
                           _envoyerReponseRapide(_suggestions[index]),
-                      backgroundColor:
-                          Theme.of(context).primaryColor.withOpacity(0.05),
+                      backgroundColor: Colors.white,
                       side: BorderSide(
                           color:
                               Theme.of(context).primaryColor.withOpacity(0.2)),
-                      labelStyle: TextStyle(
-                          color: Theme.of(context).primaryColor,
-                          fontWeight: FontWeight.w600),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
                   );
                 },
               ),
             ),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
-              boxShadow: [
-                BoxShadow(
-                    offset: const Offset(0, -2),
-                    blurRadius: 10,
-                    color: Colors.black.withOpacity(0.05)),
-              ],
+              border: Border(top: BorderSide(color: Colors.grey.shade200)),
             ),
             child: SafeArea(
               child: Row(
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: _isListening
-                          ? Colors.red.shade50
-                          : Colors.transparent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        _isListening ? Icons.mic : Icons.mic_none,
-                        color: _isListening
-                            ? Colors.red
-                            : Theme.of(context).primaryColor,
-                      ),
-                      onPressed: _basculerEcoute,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+                  _buildMicButton(),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.grey.shade800
-                            : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(28),
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(24),
                       ),
                       child: TextField(
                         controller: _textController,
                         decoration: InputDecoration(
-                          hintText: _isListening
-                              ? 'Je vous écoute...'
-                              : 'Écrivez votre message...',
+                          hintText: _isListening ? 'Écoute...' : 'Message...',
                           border: InputBorder.none,
                           contentPadding:
-                              const EdgeInsets.symmetric(vertical: 12),
+                              const EdgeInsets.symmetric(vertical: 10),
                         ),
                         onSubmitted: _envoyerMessage,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => _envoyerMessage(_textController.text),
-                    child: CircleAvatar(
-                      backgroundColor: Theme.of(context).primaryColor,
-                      radius: 24,
-                      child:
-                          const Icon(Icons.send, color: Colors.white, size: 22),
-                    ),
+                  IconButton(
+                    icon: Icon(Icons.send_rounded,
+                        color: Theme.of(context).primaryColor),
+                    onPressed: () => _envoyerMessage(_textController.text),
                   ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMicButton() {
+    return GestureDetector(
+      onTap: _basculerEcoute,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: _isListening
+              ? Colors.red.shade100
+              : Theme.of(context).primaryColor.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          _isListening ? Icons.mic : Icons.mic_none,
+          color: _isListening ? Colors.red : Theme.of(context).primaryColor,
+          size: 24,
+        ),
       ),
     );
   }

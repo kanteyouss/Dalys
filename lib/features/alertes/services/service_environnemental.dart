@@ -7,40 +7,44 @@ import 'package:dalys/data/models/modele_alerte.dart';
 /// Intègre plusieurs APIs : AirVisual, OpenWeatherMap, Breezometer
 class ServiceEnvironnemental {
   /// Instance singleton
-  static final ServiceEnvironnemental _instance = ServiceEnvironnemental._internal();
+  static final ServiceEnvironnemental _instance =
+      ServiceEnvironnemental._internal();
   factory ServiceEnvironnemental() => _instance;
   ServiceEnvironnemental._internal();
 
   /// URLs des APIs (à configurer avec de vraies clés API)
   static const String _airVisualUrl = 'http://api.airvisual.com/v2';
-  static const String _openWeatherUrl = 'http://api.openweathermap.org/data/2.5';
-  static const String _breezometerUrl = 'https://api.breezometer.com/air-quality/v2';
-  
+  static const String _openWeatherUrl =
+      'http://api.openweathermap.org/data/2.5';
+  static const String _breezometerUrl =
+      'https://api.breezometer.com/air-quality/v2';
+
   /// Clés API (à configurer depuis les variables d'environnement)
   static const String _airVisualKey = 'DEMO_KEY';
   static const String _openWeatherKey = 'DEMO_KEY';
   static const String _breezometerKey = 'DEMO_KEY';
-  
+
   /// Cache des dernières données
   Map<String, dynamic>? _dernieresdonneesEnv;
   DateTime? _derniereMiseAJourEnv;
-  
+
   /// Indique si le service est en mode simulation
   bool _modeSimulation = true;
-  
+
   /// Position actuelle
   Position? _positionActuelle;
 
   /// Active ou désactive le mode simulation
   void configurerModeSimulation(bool simulation) {
     _modeSimulation = simulation;
-    debugPrint('🌍 Service environnemental configuré en mode ${simulation ? 'simulation' : 'production'}');
+    debugPrint(
+        '🌍 Service environnemental configuré en mode ${simulation ? 'simulation' : 'production'}');
   }
 
   /// Obtient la position actuelle de l'utilisateur
   Future<Position?> _obtenirPosition() async {
     if (_positionActuelle != null) return _positionActuelle;
-    
+
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -65,10 +69,10 @@ class ServiceEnvironnemental {
       _positionActuelle = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
       );
-      
-      debugPrint('📍 Position obtenue: ${_positionActuelle!.latitude}, ${_positionActuelle!.longitude}');
+
+      debugPrint(
+          '📍 Position obtenue: ${_positionActuelle!.latitude}, ${_positionActuelle!.longitude}');
       return _positionActuelle;
-      
     } catch (erreur) {
       debugPrint('❌ Erreur localisation: $erreur');
       return null;
@@ -84,24 +88,25 @@ class ServiceEnvironnemental {
     try {
       final position = await _obtenirPosition();
       if (position == null) {
-        debugPrint('⚠️ Position non disponible, utilisation du mode simulation');
+        debugPrint(
+            '⚠️ Position non disponible, utilisation du mode simulation');
         return await _simulerAlertesEnvironnementales();
       }
 
       final alertes = <ModeleAlerte>[];
-      
+
       // Récupérer données de qualité de l'air
       final donneesAir = await _obtenirQualiteAir(position);
       if (donneesAir != null) {
         alertes.addAll(_analyserQualiteAir(donneesAir));
       }
-      
+
       // Récupérer données météorologiques
       final donneesMeteo = await _obtenirDonneesMeteo(position);
       if (donneesMeteo != null) {
         alertes.addAll(_analyserDonneesMeteo(donneesMeteo));
       }
-      
+
       // Mettre à jour le cache
       _dernieresdonneesEnv = {
         'air_quality': donneesAir,
@@ -112,10 +117,9 @@ class ServiceEnvironnemental {
         },
       };
       _derniereMiseAJourEnv = DateTime.now();
-      
+
       debugPrint('🌍 ${alertes.length} alertes environnementales générées');
       return alertes;
-      
     } catch (erreur) {
       debugPrint('❌ Erreur service environnemental: $erreur');
       return await _simulerAlertesEnvironnementales();
@@ -132,7 +136,7 @@ class ServiceEnvironnemental {
       return jsonDecode(response.body);
     }
     */
-    
+
     // Simulation pour la démonstration
     await Future.delayed(const Duration(milliseconds: 500));
     return _simulerDonneesQualiteAir();
@@ -148,7 +152,7 @@ class ServiceEnvironnemental {
       return jsonDecode(response.body);
     }
     */
-    
+
     // Simulation pour la démonstration
     await Future.delayed(const Duration(milliseconds: 500));
     return _simulerDonneesMeteo();
@@ -157,21 +161,22 @@ class ServiceEnvironnemental {
   /// Simule les alertes environnementales
   Future<List<ModeleAlerte>> _simulerAlertesEnvironnementales() async {
     await Future.delayed(const Duration(milliseconds: 800));
-    
+
     final alertes = <ModeleAlerte>[];
     final maintenant = DateTime.now();
     final heure = maintenant.hour;
-    
+
     // Simulation d'un pic de pollution matinal (7h-9h) ou de soirée (17h-19h)
     if ((heure >= 7 && heure <= 9) || (heure >= 17 && heure <= 19)) {
       alertes.add(ModeleAlerte(
         id: 'env_pollution_${maintenant.millisecondsSinceEpoch}',
         titre: 'Pic de pollution détecté',
         description: 'La qualité de l\'air à Abidjan est dégradée (AQI: 125). '
-                    'Risque accru pour les personnes souffrant de problèmes respiratoires.',
+            'Risque accru pour les personnes souffrant de problèmes respiratoires.',
         type: TypeAlerte.environnementale,
         niveauPriorite: 80,
         dateCreation: maintenant,
+        niveauNotification: NiveauNotification.alerte,
         donneesMedicales: {
           'aqi': 125,
           'pm2_5': 65.4,
@@ -190,19 +195,45 @@ class ServiceEnvironnemental {
         tags: ['environnement', 'pollution', 'air', 'aqi'],
         source: 'AirVisual API v2',
       ));
+    } else if (heure == 6 || heure == 16) {
+      // PROACTIF: Prévenir avant le pic
+      alertes.add(ModeleAlerte(
+        id: 'env_prev_pollution_${maintenant.millisecondsSinceEpoch}',
+        titre: 'Prévision : Pic de pollution attendu',
+        description: 'Un pic de pollution est prévu dans l\'heure à venir. '
+            'Pensez à fermer vos fenêtres et à limiter vos sorties.',
+        type: TypeAlerte.environnementale,
+        niveauPriorite: 45,
+        dateCreation: maintenant,
+        niveauNotification: NiveauNotification.prevention,
+        donneesMedicales: {
+          'aqi_prevu': 110,
+          'horizon': '1h',
+          'type': 'trafic_matinal',
+        },
+        recommandations: [
+          'Fermez les fenêtres avant le pic',
+          'Planifiez vos déplacements essentiels maintenant',
+          'Vérifiez votre stock de médicaments de secours',
+        ],
+        tags: ['environnement', 'prevention', 'proactif'],
+        source: 'Service Prédictif Dalys',
+      ));
     }
-    
+
     // Simulation d'alerte pollen (saison sèche : Novembre-Février)
     final mois = maintenant.month;
     if (mois >= 11 || mois <= 2) {
       alertes.add(ModeleAlerte(
         id: 'env_pollen_${maintenant.millisecondsSinceEpoch}',
         titre: 'Taux de pollen élevé',
-        description: 'Les pollens d\'arbres sont particulièrement présents aujourd\'hui. '
-                    'Risque d\'aggravation des symptômes allergiques et respiratoires.',
+        description:
+            'Les pollens d\'arbres sont particulièrement présents aujourd\'hui. '
+            'Risque d\'aggravation des symptômes allergiques et respiratoires.',
         type: TypeAlerte.environnementale,
         niveauPriorite: 60,
         dateCreation: maintenant,
+        niveauNotification: NiveauNotification.prevention,
         donneesMedicales: {
           'pollen_index': 4, // Sur une échelle de 0-5
           'dominant_pollen': 'arbres',
@@ -220,17 +251,19 @@ class ServiceEnvironnemental {
         source: 'Service Météorologique',
       ));
     }
-    
+
     // Simulation d'alerte poussière (Harmattan : Décembre-Février)
     if (mois >= 12 || mois <= 2) {
       alertes.add(ModeleAlerte(
         id: 'env_harmattan_${maintenant.millisecondsSinceEpoch}',
         titre: 'Alerte Harmattan',
-        description: 'Vents chargés de poussière du Sahara. Visibilité réduite et '
-                    'risque d\'irritation des voies respiratoires.',
+        description:
+            'Vents chargés de poussière du Sahara. Visibilité réduite et '
+            'risque d\'irritation des voies respiratoires.',
         type: TypeAlerte.environnementale,
         niveauPriorite: 70,
         dateCreation: maintenant,
+        niveauNotification: NiveauNotification.alerte,
         donneesMedicales: {
           'visibilite': 2.5, // km
           'particules_dust': 150, // µg/m³
@@ -249,7 +282,7 @@ class ServiceEnvironnemental {
         source: 'SODEXAM Météo',
       ));
     }
-    
+
     debugPrint('🌍 ${alertes.length} alertes environnementales simulées');
     return alertes;
   }
@@ -291,12 +324,7 @@ class ServiceEnvironnemental {
     return {
       'coord': {'lon': -4.0267, 'lat': 5.3364}, // Abidjan
       'weather': [
-        {
-          'id': 800,
-          'main': 'Clear',
-          'description': 'clear sky',
-          'icon': '01d'
-        }
+        {'id': 800, 'main': 'Clear', 'description': 'clear sky', 'icon': '01d'}
       ],
       'base': 'stations',
       'main': {
@@ -320,21 +348,25 @@ class ServiceEnvironnemental {
   /// Analyse les données de qualité de l'air et génère des alertes
   List<ModeleAlerte> _analyserQualiteAir(Map<String, dynamic> donnees) {
     final alertes = <ModeleAlerte>[];
-    
+
     // Extraire l'AQI
     final pollution = donnees['data']?['current']?['pollution'];
     if (pollution != null) {
       final aqi = pollution['aqius'] as int? ?? 50;
-      
-      if (aqi > 100) { // Malsain pour les groupes sensibles
+
+      if (aqi > 100) {
+        // Malsain pour les groupes sensibles
         alertes.add(ModeleAlerte(
           id: 'aqi_${DateTime.now().millisecondsSinceEpoch}',
           titre: 'Qualité de l\'air dégradée',
           description: 'L\'indice de qualité de l\'air est de $aqi. '
-                      'L\'air peut être malsain pour les personnes sensibles.',
+              'L\'air peut être malsain pour les personnes sensibles.',
           type: TypeAlerte.environnementale,
           niveauPriorite: aqi > 150 ? 85 : 70,
           dateCreation: DateTime.now(),
+          niveauNotification: aqi > 150
+              ? NiveauNotification.urgence
+              : NiveauNotification.alerte,
           donneesMedicales: {
             'aqi': aqi,
             'source': 'AirVisual',
@@ -346,26 +378,26 @@ class ServiceEnvironnemental {
         ));
       }
     }
-    
+
     return alertes;
   }
 
   /// Analyse les données météorologiques et génère des alertes
   List<ModeleAlerte> _analyserDonneesMeteo(Map<String, dynamic> donnees) {
     final alertes = <ModeleAlerte>[];
-    
+
     final main = donnees['main'];
     if (main != null) {
       final humidite = main['humidity'] as int? ?? 60;
       final temperature = main['temp'] as double? ?? 28.0;
-      
+
       // Alerte humidité élevée (>85%) - favorise les acariens et moisissures
       if (humidite > 85) {
         alertes.add(ModeleAlerte(
           id: 'humid_${DateTime.now().millisecondsSinceEpoch}',
           titre: 'Humidité élevée détectée',
           description: 'L\'humidité relative est de $humidite%. '
-                      'Conditions favorables aux acariens et moisissures.',
+              'Conditions favorables aux acariens et moisissures.',
           type: TypeAlerte.environnementale,
           niveauPriorite: 60,
           dateCreation: DateTime.now(),
@@ -383,14 +415,14 @@ class ServiceEnvironnemental {
           source: 'OpenWeatherMap',
         ));
       }
-      
+
       // Alerte température extrême (>35°C)
       if (temperature > 35) {
         alertes.add(ModeleAlerte(
           id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
           titre: 'Température élevée',
           description: 'Température de ${temperature.toStringAsFixed(1)}°C. '
-                      'Risque de déshydratation et stress thermique.',
+              'Risque de déshydratation et stress thermique.',
           type: TypeAlerte.environnementale,
           niveauPriorite: 65,
           dateCreation: DateTime.now(),
@@ -409,7 +441,7 @@ class ServiceEnvironnemental {
         ));
       }
     }
-    
+
     return alertes;
   }
 
@@ -439,18 +471,19 @@ class ServiceEnvironnemental {
   }
 
   /// Obtient les dernières données environnementales
-  Map<String, dynamic>? get dernieresdonneesEnvironnementales => _dernieresdonneesEnv;
-  
+  Map<String, dynamic>? get dernieresdonneesEnvironnementales =>
+      _dernieresdonneesEnv;
+
   /// Obtient la date de dernière mise à jour
   DateTime? get derniereMiseAJourEnvironnementale => _derniereMiseAJourEnv;
-  
+
   /// Test de connectivité
   Future<bool> testerConnectivite() async {
     if (_modeSimulation) {
       debugPrint('🧪 Test connectivité environnementale (simulation): OK');
       return true;
     }
-    
+
     // TODO: Implémenter test réel des APIs
     return false;
   }

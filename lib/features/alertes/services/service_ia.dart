@@ -12,14 +12,15 @@ class ServiceIA {
 
   /// URL de base du serveur IA (à configurer selon l'environnement)
   static const String _baseUrl = 'http://localhost:8000/api/v1/predictions';
-  
+
   /// Indique si le service est en mode simulation
   bool _modeSimulation = true;
 
   /// Active ou désactive le mode simulation
   void configurerModeSimulation(bool simulation) {
     _modeSimulation = simulation;
-    debugPrint('🧠 Service IA configuré en mode ${simulation ? 'simulation' : 'production'}');
+    debugPrint(
+        '🧠 Service IA configuré en mode ${simulation ? 'simulation' : 'production'}');
   }
 
   /// Récupère les prédictions de risque depuis le serveur IA
@@ -30,7 +31,8 @@ class ServiceIA {
     Map<String, dynamic>? donneesEnvironnementales,
   }) async {
     if (_modeSimulation) {
-      return await _simulerPredictionsIA(donneesPatient, donneesEnvironnementales);
+      return await _simulerPredictionsIA(
+          donneesPatient, donneesEnvironnementales);
     }
 
     try {
@@ -51,10 +53,11 @@ class ServiceIA {
         return _parseAlertes(data['predictions']);
       }
       */
-      
-      debugPrint('⚠️ Serveur IA non disponible, utilisation du mode simulation');
-      return await _simulerPredictionsIA(donneesPatient, donneesEnvironnementales);
-      
+
+      debugPrint(
+          '⚠️ Serveur IA non disponible, utilisation du mode simulation');
+      return await _simulerPredictionsIA(
+          donneesPatient, donneesEnvironnementales);
     } catch (erreur) {
       debugPrint('❌ Erreur service IA: $erreur');
       return [];
@@ -78,11 +81,13 @@ class ServiceIA {
       alertes.add(ModeleAlerte(
         id: 'ia_spo2_${maintenant.millisecondsSinceEpoch}',
         titre: 'Risque critique de désaturation',
-        description: 'L\'IA détecte un risque élevé de crise respiratoire basé sur votre SpO₂ actuel (${spo2.toStringAsFixed(1)}%). '
-                    'Une consultation médicale urgente est recommandée.',
+        description:
+            'L\'IA détecte un risque élevé de crise respiratoire basé sur votre SpO₂ actuel (${spo2.toStringAsFixed(1)}%). '
+            'Une consultation médicale urgente est recommandée.',
         type: TypeAlerte.critique,
         dateCreation: maintenant,
         niveauPriorite: 100,
+        niveauNotification: NiveauNotification.urgence,
         donneesMedicales: {
           'spo2_actuel': spo2,
           'seuil_critique': 90,
@@ -101,11 +106,13 @@ class ServiceIA {
       alertes.add(ModeleAlerte(
         id: 'ia_spo2_${maintenant.millisecondsSinceEpoch}',
         titre: 'Alerte SpO₂ : Surveillance renforcée',
-        description: 'L\'IA recommande une surveillance accrue. Votre SpO₂ (${spo2.toStringAsFixed(1)}%) '
-                    'est en dessous des valeurs optimales.',
+        description:
+            'L\'IA recommande une surveillance accrue. Votre SpO₂ (${spo2.toStringAsFixed(1)}%) '
+            'est en dessous des valeurs optimales.',
         type: TypeAlerte.ia,
         niveauPriorite: 75,
         dateCreation: maintenant,
+        niveauNotification: NiveauNotification.alerte,
         donneesMedicales: {
           'spo2_actuel': spo2,
           'seuil_optimal': 95,
@@ -120,19 +127,46 @@ class ServiceIA {
         tags: ['ia', 'spo2', 'surveillance'],
         source: 'IA Prédictive v2.1',
       ));
+    } else if (spo2 < 96 && (donneesPatient['tendance_spo2'] == 'baisse')) {
+      // PROACTIF: Prévention avant que ça ne devienne critique
+      alertes.add(ModeleAlerte(
+        id: 'ia_prev_spo2_${maintenant.millisecondsSinceEpoch}',
+        titre: 'Conseil Prévention : Légère baisse de SpO₂',
+        description: 'L\'IA a détecté une tendance à la baisse de votre SpO₂. '
+            'Il est conseillé de vous reposer et de pratiquer quelques exercices de respiration profonde.',
+        type: TypeAlerte.ia,
+        niveauPriorite: 40,
+        dateCreation: maintenant,
+        niveauNotification: NiveauNotification.prevention,
+        donneesMedicales: {
+          'spo2_actuel': spo2,
+          'tendance': 'baisse_legere',
+          'anticipation': true,
+        },
+        recommandations: [
+          'Pratiquez la respiration abdominale pendant 5 minutes',
+          'Assurez-vous que votre environnement est bien aéré',
+          'Reposez-vous en position assise',
+        ],
+        tags: ['ia', 'prevention', 'proactif'],
+        source: 'IA Prédictive v2.1',
+      ));
     }
 
     // Analyser la fréquence respiratoire
-    final freqResp = donneesPatient['frequence_respiratoire'] as double? ?? 18.0;
+    final freqResp =
+        donneesPatient['frequence_respiratoire'] as double? ?? 18.0;
     if (freqResp > 25) {
       alertes.add(ModeleAlerte(
         id: 'ia_freq_${maintenant.millisecondsSinceEpoch}',
         titre: 'Détection de tachypnée',
-        description: 'L\'IA a détecté une fréquence respiratoire élevée (${freqResp.toInt()} bpm). '
-                    'Cela peut indiquer une détresse respiratoire.',
+        description:
+            'L\'IA a détecté une fréquence respiratoire élevée (${freqResp.toInt()} bpm). '
+            'Cela peut indiquer une détresse respiratoire.',
         type: TypeAlerte.ia,
         niveauPriorite: 80,
         dateCreation: maintenant,
+        niveauNotification: NiveauNotification.alerte,
         donneesMedicales: {
           'frequence_actuelle': freqResp,
           'frequence_normale': '12-20 bpm',
@@ -156,11 +190,13 @@ class ServiceIA {
         alertes.add(ModeleAlerte(
           id: 'ia_env_${maintenant.millisecondsSinceEpoch}',
           titre: 'Risque environnemental détecté',
-          description: 'L\'IA corrèle vos données médicales avec la pollution actuelle (AQI: ${pollution.toInt()}). '
-                      'Risque accru de complications respiratoires.',
+          description:
+              'L\'IA corrèle vos données médicales avec la pollution actuelle (AQI: ${pollution.toInt()}). '
+              'Risque accru de complications respiratoires.',
           type: TypeAlerte.ia,
           niveauPriorite: 70,
           dateCreation: maintenant,
+          niveauNotification: NiveauNotification.alerte,
           donneesMedicales: {
             'aqi_actuel': pollution,
             'seuil_risque': 100,
@@ -182,8 +218,6 @@ class ServiceIA {
     debugPrint('🧠 IA a généré ${alertes.length} prédictions');
     return alertes;
   }
-
-
 
   /// Envoie des données pour l'entraînement du modèle IA
   Future<bool> envoyerDonneesEntrainement({

@@ -70,6 +70,27 @@ enum TypeAlerte {
   }
 }
 
+/// Énumération des niveaux de notification pour l'adaptation du système
+enum NiveauNotification {
+  prevention('prevention', 'Prévention', Icons.info_outline, Colors.blue),
+  alerte('alerte', 'Alerte', Icons.warning_amber_rounded, Colors.orange),
+  urgence('urgence', 'Urgence', Icons.emergency, Colors.red);
+
+  const NiveauNotification(this.valeur, this.libelle, this.icone, this.couleur);
+
+  final String valeur;
+  final String libelle;
+  final IconData icone;
+  final Color couleur;
+
+  static NiveauNotification depuisChaine(String valeur) {
+    return NiveauNotification.values.firstWhere(
+      (n) => n.valeur == valeur || n.name == valeur,
+      orElse: () => NiveauNotification.alerte,
+    );
+  }
+}
+
 /// Énumération des statuts d'alerte
 enum StatutAlerte {
   nouvelle('nouvelle', 'Nouvelle', Icons.fiber_new, Colors.red),
@@ -175,6 +196,9 @@ class ModeleAlerte {
   /// Date d'expiration (ancien modèle)
   final DateTime? dateExpiration;
 
+  /// Niveau de notification pour l'adaptation (proactif, alerte, urgence)
+  final NiveauNotification niveauNotification;
+
   /// Constructeur principal unifié
   ModeleAlerte({
     required this.id,
@@ -196,6 +220,7 @@ class ModeleAlerte {
     this.recommandations = const [],
     this.source = 'E-Santé 4.0',
     this.dateExpiration,
+    this.niveauNotification = NiveauNotification.alerte,
   }) : dateModification = dateModification ?? dateCreation;
 
   /// Constructeur de compatibilité avec l'ancien modèle
@@ -225,6 +250,10 @@ class ModeleAlerte {
           recommandations: recommandations,
           source: source,
           dateExpiration: dateExpiration,
+          niveauNotification: severite == NiveauSeverite.critique ||
+                  severite == NiveauSeverite.eleve
+              ? NiveauNotification.urgence
+              : NiveauNotification.alerte,
         );
 
   /// Constructeur pour alerte critique avec paramètres simplifiés
@@ -246,6 +275,7 @@ class ModeleAlerte {
           niveauPriorite: 100,
           tags: tags,
           donneesMedicales: donneesMedicales,
+          niveauNotification: NiveauNotification.urgence,
           actions: {
             'consulter': 'Consulter immédiatement',
             'reporter': 'Reporter (non recommandé)',
@@ -358,6 +388,7 @@ class ModeleAlerte {
     String? idUtilisateur,
     Map<String, dynamic>? donneesMedicales,
     bool? estRecurrente,
+    NiveauNotification? niveauNotification,
   }) {
     return ModeleAlerte(
       id: id,
@@ -379,6 +410,7 @@ class ModeleAlerte {
       recommandations: recommandations,
       source: source,
       dateExpiration: dateExpiration,
+      niveauNotification: niveauNotification ?? this.niveauNotification,
     );
   }
 
@@ -445,6 +477,7 @@ class ModeleAlerte {
       'recommandations': recommandations,
       'source': source,
       'date_expiration': dateExpiration?.toIso8601String(),
+      'niveau_notification': niveauNotification.valeur,
     };
   }
 
@@ -504,6 +537,8 @@ class ModeleAlerte {
       dateExpiration: map['date_expiration'] != null
           ? DateTime.parse(map['date_expiration'] as String)
           : null,
+      niveauNotification: NiveauNotification.depuisChaine(
+          map['niveau_notification'] as String? ?? 'alerte'),
     );
   }
 

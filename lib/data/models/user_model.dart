@@ -8,6 +8,8 @@ class UserModel {
   final String? emergencyContactName;
   final String? emergencyContactPhone;
   final String? emergencyContactEmail;
+  final String? doctorEmail;
+  final String? hospitalEmail;
 
   UserModel({
     this.id,
@@ -19,6 +21,8 @@ class UserModel {
     this.emergencyContactName,
     this.emergencyContactPhone,
     this.emergencyContactEmail,
+    this.doctorEmail,
+    this.hospitalEmail,
   });
 
   Map<String, dynamic> toMap() {
@@ -32,6 +36,8 @@ class UserModel {
       'emergency_contact_name': emergencyContactName,
       'emergency_contact_phone': emergencyContactPhone,
       'emergency_contact_email': emergencyContactEmail,
+      'doctor_email': doctorEmail,
+      'hospital_email': hospitalEmail,
     };
   }
 
@@ -46,6 +52,8 @@ class UserModel {
       emergencyContactName: map['emergency_contact_name'],
       emergencyContactPhone: map['emergency_contact_phone'],
       emergencyContactEmail: map['emergency_contact_email'],
+      doctorEmail: map['doctor_email'],
+      hospitalEmail: map['hospital_email'],
     );
   }
 
@@ -59,6 +67,8 @@ class UserModel {
     String? emergencyContactName,
     String? emergencyContactPhone,
     String? emergencyContactEmail,
+    String? doctorEmail,
+    String? hospitalEmail,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -72,6 +82,8 @@ class UserModel {
           emergencyContactPhone ?? this.emergencyContactPhone,
       emergencyContactEmail:
           emergencyContactEmail ?? this.emergencyContactEmail,
+      doctorEmail: doctorEmail ?? this.doctorEmail,
+      hospitalEmail: hospitalEmail ?? this.hospitalEmail,
     );
   }
 }

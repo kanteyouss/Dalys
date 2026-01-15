@@ -1,6 +1,7 @@
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter/foundation.dart';
+import '../models/modele_alerte.dart';
 
 /// Service gérant la reconnaissance vocale (STT) et la synthèse vocale (TTS)
 class ServiceVocal {
@@ -50,7 +51,7 @@ class ServiceVocal {
         _isSttInitialized = true; // Mock initialization
         return;
       }
-      
+
       if (!_isSttInitialized) {
         _isSttInitialized = await _speechToText.initialize(
           onStatus: (status) => onStatus?.call(status),
@@ -92,22 +93,46 @@ class ServiceVocal {
   /// Arrête l'écoute
   Future<void> arreterEcoute() async {
     if (defaultTargetPlatform == TargetPlatform.linux) return;
-    
+
     if (_isSttInitialized) {
       await _speechToText.stop();
     }
   }
 
-  /// Parle (Synthèse vocale)
-  Future<void> parler(String texte) async {
+  /// Parle (Synthèse vocale) avec adaptation situationnelle
+  Future<void> parler(String texte, {NiveauNotification? niveau}) async {
     if (!_isTtsInitialized) await _initTts();
 
     if (defaultTargetPlatform == TargetPlatform.linux) {
-      debugPrint("[MOCK TTS] Robot dit : $texte");
+      debugPrint(
+          "[MOCK TTS] [${niveau?.valeur ?? 'normal'}] Robot dit : $texte");
       return;
     }
 
-    if (texte.isNotEmpty) {
+    if (texte.isEmpty) return;
+
+    // Adaptation selon le niveau
+    switch (niveau) {
+      case NiveauNotification.prevention:
+        await _flutterTts.setPitch(0.9);
+        await _flutterTts.setSpeechRate(0.4);
+        break;
+      case NiveauNotification.urgence:
+        await _flutterTts.setPitch(1.2);
+        await _flutterTts.setSpeechRate(0.6);
+        break;
+      case NiveauNotification.alerte:
+      default:
+        await _flutterTts.setPitch(1.0);
+        await _flutterTts.setSpeechRate(0.5);
+        break;
+    }
+
+    await _flutterTts.speak(texte);
+
+    // Répétition pour l'urgence (optionnel, selon le besoin de rapidité)
+    if (niveau == NiveauNotification.urgence) {
+      await Future.delayed(const Duration(seconds: 1));
       await _flutterTts.speak(texte);
     }
   }

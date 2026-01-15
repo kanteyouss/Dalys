@@ -23,15 +23,38 @@ class _ShareCenterState extends State<ShareCenter> {
     setState(() => _isGenerating = true);
 
     try {
-      // Récupérer les données des 30 derniers jours
       final data =
           await _healthRepo.getHealthData(userId: user.id!, limit: 100);
-      await _reportService.generateAndShareReport(user, data);
+      await _reportService.generateAndShareReport(user: user, data: data);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Erreur lors de la génération du rapport : $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGenerating = false);
+      }
+    }
+  }
+
+  Future<void> _downloadReport() async {
+    final user = _authService.currentUser;
+    if (user == null) return;
+
+    setState(() => _isGenerating = true);
+
+    try {
+      final data =
+          await _healthRepo.getHealthData(userId: user.id!, limit: 100);
+      await _reportService.generateAndPrintReport(user: user, data: data);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Erreur lors de l\'impression du rapport : $e')),
         );
       }
     } finally {
@@ -72,7 +95,7 @@ class _ShareCenterState extends State<ShareCenter> {
             ),
             const SizedBox(height: 40),
             ElevatedButton.icon(
-              onPressed: _isGenerating ? null : _generateReport,
+              onPressed: _isGenerating ? null : _downloadReport,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
                 backgroundColor: const Color(0xFF2E7D8A),
@@ -81,20 +104,27 @@ class _ShareCenterState extends State<ShareCenter> {
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              icon: _isGenerating
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Icon(Icons.download),
-              label: Text(
-                _isGenerating ? 'Génération...' : 'Générer le rapport PDF',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              icon: const Icon(Icons.download),
+              label: const Text(
+                'Télécharger / Imprimer le PDF',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: _isGenerating ? null : _generateReport,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(56),
+                side: const BorderSide(color: Color(0xFF2E7D8A), width: 2),
+                foregroundColor: const Color(0xFF2E7D8A),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              icon: const Icon(Icons.share),
+              label: const Text(
+                'Partager via WhatsApp / Autre',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ],

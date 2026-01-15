@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../controllers/health_controller.dart';
 import '../widgets/health_indicator_card.dart';
-import '../widgets/risk_level_indicator.dart';
+import '../widgets/status_hero_section.dart';
 import '../widgets/health_chart.dart';
 import '../widgets/add_measurement_dialog.dart';
 import '../../ai_suggestions/widgets/carte_suggestion.dart';
@@ -72,32 +72,6 @@ class _HealthDashboardState extends State<HealthDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('E-Santé 4.0 - Dashboard'),
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          Consumer<HealthController>(
-            builder: (context, controller, _) {
-              return Switch(
-                value: controller.isSimulationMode,
-                onChanged: (value) => controller.toggleSimulationMode(value),
-                activeColor: Colors.white,
-                activeTrackColor: Colors.greenAccent,
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () => Navigator.pushNamed(context, '/alerts'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () => Navigator.pushNamed(context, '/profile'),
-          ),
-        ],
-      ),
       body: Consumer<HealthController>(
         builder: (context, controller, child) {
           if (controller.isLoading) {
@@ -169,193 +143,75 @@ class _HealthDashboardState extends State<HealthDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (isHighRisk) _buildCrisisBanner(),
-                    RiskLevelIndicator(riskLevel: currentData.riskLevel),
-                    const SizedBox(height: 24),
-                    _buildSectionHeader(context, 'Paramètres Vitaux',
-                        onInfo: () => _showGlobalInfo(context)),
-                    const SizedBox(height: 16),
-                    _buildSOSButton(context),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: HealthIndicatorCard(
-                            title: 'SpO₂',
-                            value: '${currentData.spo2}%',
-                            icon: Icons.favorite,
-                            color: currentData.isSpo2Normal
-                                ? Colors.green
-                                : Colors.red,
-                            normalRange: '95-100%',
-                            trend: spo2Trend,
-                            onTap: () => _showParameterDetails(
-                                context, 'SpO₂', currentData.spo2.toString()),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: HealthIndicatorCard(
-                            title: 'Respiration',
-                            value: '${currentData.breathingRate} bpm',
-                            icon: Icons.air,
-                            color: currentData.isBreathingRateNormal
-                                ? Colors.green
-                                : Colors.red,
-                            normalRange: '12-20 bpm',
-                            trend: breathingTrend,
-                            onTap: () => _showParameterDetails(
-                                context,
-                                'Respiration',
-                                '${currentData.breathingRate} bpm'),
-                          ),
-                        ),
-                      ],
+                    StatusHeroSection(riskLevel: currentData.riskLevel),
+                    const SizedBox(height: 32),
+
+                    // Section: Paramètres Vitaux
+                    _buildSectionHeader(
+                      context,
+                      'Paramètres Vitaux',
+                      onInfo: () => _showGlobalInfo(context),
                     ),
+                    const SizedBox(height: 16),
+                    _buildSOSButton(context, isHighRisk),
+
+                    // Vitals Grid
+                    _buildVitalsGrid(
+                        context, currentData, spo2Trend, breathingTrend),
                     const SizedBox(height: 12),
                     HealthIndicatorCard(
-                      title: 'Débit de pointe (PEF)',
+                      title: 'Souffle',
                       value: '${currentData.pef.toInt()} L/min',
                       icon: Icons.timeline,
                       color:
                           currentData.isPefNormal ? Colors.green : Colors.red,
                       normalRange: '350-500 L/min',
                       trend: pefTrend,
-                      onTap: () => _showParameterDetails(
-                          context, 'PEF', '${currentData.pef.toInt()} L/min'),
+                      onTap: () => _showParameterDetails(context, 'Souffle',
+                          '${currentData.pef.toInt()} L/min'),
                     ),
-                    const SizedBox(height: 12),
+
+                    // Environmental Data (Grouped)
                     if (currentData.temperature != null ||
-                        currentData.humidity != null)
-                      Row(
-                        children: [
-                          if (currentData.temperature != null)
-                            Expanded(
-                              child: HealthIndicatorCard(
-                                title: 'Température',
-                                value:
-                                    '${currentData.temperature!.toStringAsFixed(1)}°C',
-                                icon: Icons.thermostat,
-                                color: (currentData.temperature! >= 36.0 &&
-                                        currentData.temperature! <= 37.8)
-                                    ? Colors.green
-                                    : Colors.orange,
-                                normalRange: '36.5-37.5°C',
-                                onTap: () => _showParameterDetails(
-                                    context,
-                                    'Température',
-                                    '${currentData.temperature!.toStringAsFixed(1)}°C'),
-                              ),
-                            ),
-                          if (currentData.temperature != null &&
-                              currentData.humidity != null)
-                            const SizedBox(width: 12),
-                          if (currentData.humidity != null)
-                            Expanded(
-                              child: HealthIndicatorCard(
-                                title: 'Humidité',
-                                value: '${currentData.humidity!.toInt()}%',
-                                icon: Icons.water_drop,
-                                color: Colors.blue,
-                                normalRange: '40-60%',
-                                onTap: () => _showParameterDetails(
-                                    context,
-                                    'Humidité',
-                                    '${currentData.humidity!.toInt()}%'),
-                              ),
-                            ),
-                        ],
-                      ),
-                    const SizedBox(height: 24),
-                    _buildSectionHeader(context, 'Évolution (7 jours)'),
-                    const SizedBox(height: 16),
-                    HealthChart(
-                        data: controller.historicalData,
-                        title: 'SpO₂',
-                        parameter: 'spo2',
-                        color: Colors.red.shade400,
-                        minY: 85,
-                        maxY: 100),
-                    const SizedBox(height: 16),
-                    HealthChart(
-                        data: controller.historicalData,
-                        title: 'Respiration',
-                        parameter: 'breathingRate',
-                        color: Colors.blue.shade400,
-                        minY: 10,
-                        maxY: 30),
-                    const SizedBox(height: 16),
-                    HealthChart(
-                        data: controller.historicalData,
-                        title: 'PEF',
-                        parameter: 'pef',
-                        color: Colors.green.shade400,
-                        minY: 200,
-                        maxY: 600),
-                    const SizedBox(height: 24),
-                    if (currentData.symptoms.isNotEmpty) ...[
-                      _buildSectionHeader(context, 'Symptômes signalés'),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: currentData.symptoms
-                            .map((symptom) => Chip(
-                                  label: Text(symptom),
-                                  backgroundColor: Colors.orange.shade100,
-                                  avatar: Icon(Icons.warning_amber,
-                                      size: 18, color: Colors.orange.shade600),
-                                ))
-                            .toList(),
-                      ),
+                        currentData.humidity != null) ...[
                       const SizedBox(height: 24),
+                      _buildEnvironmentalSection(context, currentData),
                     ],
-                    if (_suggestions.isNotEmpty) ...[
-                      _buildSectionHeader(context, 'Conseils IA',
+
+                    const SizedBox(height: 24),
+                    _buildTrainingSection(context),
+
+                    // Secondary sections (Hidden or collapsed during high risk)
+                    if (!isHighRisk) ...[
+                      const SizedBox(height: 24),
+                      if (currentData.symptoms.isNotEmpty) ...[
+                        _buildSectionHeader(context, 'Symptômes signalés'),
+                        const SizedBox(height: 12),
+                        _buildSymptomChips(currentData.symptoms),
+                        const SizedBox(height: 24),
+                      ],
+                      if (_suggestions.isNotEmpty) ...[
+                        _buildSectionHeader(
+                          context,
+                          'Conseils IA',
                           onAction: () =>
                               Navigator.pushNamed(context, '/suggestions'),
-                          actionLabel: 'Voir tout'),
-                      const SizedBox(height: 8),
-                      ..._suggestions
-                          .take(2)
-                          .map((suggestion) => CarteSuggestion(
-                                suggestion: suggestion,
-                                onTap: () => Navigator.pushNamed(
-                                    context, '/suggestions'),
-                              )),
-                      const SizedBox(height: 24),
-                    ],
-                    _buildSectionHeader(context, 'Actions rapides'),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              Navigator.pushNamed(context, '/chatbot');
-                            },
-                            icon: const Icon(Icons.chat),
-                            label: const Text('Signaler symptômes'),
-                            style: ElevatedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16)),
-                          ),
+                          actionLabel: 'Voir tout',
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              Navigator.pushNamed(context, '/suggestions');
-                            },
-                            icon: const Icon(Icons.lightbulb_outline),
-                            label: const Text('Conseils IA'),
-                            style: OutlinedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16)),
-                          ),
-                        ),
+                        const SizedBox(height: 8),
+                        ..._suggestions
+                            .take(1)
+                            .map((suggestion) => CarteSuggestion(
+                                  suggestion: suggestion,
+                                  onTap: () => Navigator.pushNamed(
+                                      context, '/suggestions'),
+                                )),
+                        const SizedBox(height: 24),
                       ],
-                    ),
+                    ],
+
+                    // Actions rapides (Consolidated)
+                    _buildQuickActions(context),
                     const SizedBox(height: 100),
                   ],
                 ),
@@ -427,7 +283,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
     );
   }
 
-  Widget _buildSOSButton(BuildContext context) {
+  Widget _buildSOSButton(BuildContext context, bool isHighRisk) {
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       child: InkWell(
@@ -441,7 +297,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
         },
         borderRadius: BorderRadius.circular(24),
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isHighRisk ? 28 : 20),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [Colors.red.shade700, Colors.red.shade500],
@@ -467,16 +323,16 @@ class _HealthDashboardState extends State<HealthDashboard> {
                     color: Colors.white, size: 32),
               ),
               const SizedBox(width: 16),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('DÉCLENCHER SOS',
                         style: TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.1)),
+                            fontSize: isHighRisk ? 22 : 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2)),
                     Text('Alerte immédiate aux proches',
                         style: TextStyle(color: Colors.white70, fontSize: 13)),
                   ],
@@ -487,6 +343,219 @@ class _HealthDashboardState extends State<HealthDashboard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildVitalsGrid(BuildContext context, HealthData currentData,
+      Trend spo2Trend, Trend breathingTrend) {
+    return Row(
+      children: [
+        Expanded(
+          child: HealthIndicatorCard(
+            title: 'Oxygène',
+            value: '${currentData.spo2}%',
+            icon: Icons.favorite,
+            color: currentData.isSpo2Normal ? Colors.green : Colors.red,
+            normalRange: '95-100%',
+            trend: spo2Trend,
+            onTap: () => _showParameterDetails(
+                context, 'Oxygène', currentData.spo2.toString()),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: HealthIndicatorCard(
+            title: 'Respiration',
+            value: '${currentData.breathingRate} bpm',
+            icon: Icons.air,
+            color:
+                currentData.isBreathingRateNormal ? Colors.green : Colors.red,
+            normalRange: '12-20 bpm',
+            trend: breathingTrend,
+            onTap: () => _showParameterDetails(
+                context, 'Respiration', '${currentData.breathingRate} bpm'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEnvironmentalSection(
+      BuildContext context, HealthData currentData) {
+    if (currentData.temperature == null && currentData.humidity == null)
+      return const SizedBox.shrink();
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            const Icon(Icons.wb_cloudy_outlined, color: Colors.blueGrey),
+            const SizedBox(width: 16),
+            const Text(
+              'Environnement',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const Spacer(),
+            if (currentData.temperature != null) ...[
+              const Icon(Icons.thermostat, size: 16, color: Colors.orange),
+              Text(' ${currentData.temperature!.toStringAsFixed(1)}°C'),
+              const SizedBox(width: 16),
+            ],
+            if (currentData.humidity != null) ...[
+              const Icon(Icons.water_drop, size: 16, color: Colors.blue),
+              Text(' ${currentData.humidity!.toInt()}%'),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSymptomChips(List<String> symptoms) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: symptoms
+          .map((symptom) => Chip(
+                label: Text(symptom, style: const TextStyle(fontSize: 12)),
+                backgroundColor: Colors.orange.shade50,
+                side: BorderSide(color: Colors.orange.shade200),
+                avatar: Icon(Icons.warning_amber,
+                    size: 14, color: Colors.orange.shade600),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(context, 'Actions'),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                context,
+                'Conseils',
+                Icons.lightbulb_outline,
+                () => Navigator.pushNamed(context, '/suggestions'),
+                isPrimary: false,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: _buildActionButton(
+            context,
+            'Partager mes données (PDF)',
+            Icons.share,
+            () => Navigator.pushNamed(context, '/centre-partage'),
+            isPrimary: false,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTrainingSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(context, 'Entraînement & Réhabilitation'),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 4,
+          shadowColor: Colors.blue.withOpacity(0.2),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: InkWell(
+            onTap: () => Navigator.pushNamed(context, '/respiration'),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: LinearGradient(
+                  colors: [Colors.blue.shade50, Colors.white],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.spa, color: Colors.blue, size: 32),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Respiration Guidée',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Cohérence cardiaque et exercices pour renforcer votre souffle.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios,
+                      size: 16, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton(
+      BuildContext context, String label, IconData icon, VoidCallback onTap,
+      {required bool isPrimary}) {
+    return ElevatedButton.icon(
+      onPressed: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      icon: Icon(icon, size: 20),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor:
+            isPrimary ? Theme.of(context).primaryColor : Colors.white,
+        foregroundColor:
+            isPrimary ? Colors.white : Theme.of(context).primaryColor,
+        elevation: isPrimary ? 2 : 0,
+        side: isPrimary
+            ? null
+            : BorderSide(color: Theme.of(context).primaryColor),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -534,12 +603,12 @@ class _HealthDashboardState extends State<HealthDashboard> {
 
   String _getParameterDescription(String parameter) {
     switch (parameter) {
-      case 'SpO₂':
+      case 'Oxygène':
         return 'La saturation en oxygène mesure le pourcentage d\'oxygène dans le sang. Une valeur normale se situe entre 95% et 100%.';
       case 'Respiration':
         return 'La fréquence respiratoire indique le nombre de respirations par minute. La normale pour un adulte est entre 12 et 20 bpm.';
-      case 'PEF':
-        return 'Le débit expiratoire de pointe mesure la vitesse maximale d\'expiration. Il aide à évaluer la fonction pulmonaire.';
+      case 'Souffle':
+        return 'Le débit de pointe (PEF) mesure la vitesse maximale d\'expiration. Il aide à évaluer la fonction pulmonaire.';
       case 'Température':
         return 'La normale se situe entre 36.5°C et 37.5°C.';
       case 'Humidité':

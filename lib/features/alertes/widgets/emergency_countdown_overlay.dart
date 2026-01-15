@@ -5,6 +5,9 @@ import '../../../data/services/emergency_service.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/services/service_reconnaissance_vocale.dart';
 import '../../../data/services/service_vocal.dart';
+import '../../../data/models/modele_alerte.dart';
+import 'package:provider/provider.dart';
+import '../../health_monitoring/controllers/health_controller.dart';
 
 class EmergencyCountdownOverlay extends StatefulWidget {
   final UserModel user;
@@ -50,13 +53,14 @@ class _EmergencyCountdownOverlayState extends State<EmergencyCountdownOverlay> {
     _emergencyService.triggerEmergencyWithCountdown(
       widget.user,
       widget.stateDescription,
+      recentHistory: context.read<HealthController>().historicalData,
       onTick: (seconds) {
         if (mounted) {
           setState(() => _remainingSeconds = seconds);
           // Feedback sensoriel à chaque seconde
           HapticFeedback.heavyImpact();
-          _vocalService
-              .parler(seconds.toString()); // Optionnel: dire le chiffre
+          _vocalService.parler(seconds.toString(),
+              niveau: NiveauNotification.urgence); // Optionnel: dire le chiffre
         }
       },
       onComplete: () {
@@ -95,138 +99,160 @@ class _EmergencyCountdownOverlayState extends State<EmergencyCountdownOverlay> {
       child: Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A), // Fond sombre pour contraste max
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.red.withOpacity(0.5), width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.red.withOpacity(0.4),
-                blurRadius: 30,
-                spreadRadius: 10,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildPulsingIcon(),
-              const SizedBox(height: 20),
-              const Text(
-                'ALERTE CRITIQUE',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Un état critique a été détecté :\n"${widget.stateDescription}"',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 18,
-                  color: Colors.white70,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Compteur circulaire haute visibilité
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 140,
-                    height: 140,
-                    child: CircularProgressIndicator(
-                      value: _remainingSeconds / 20,
-                      strokeWidth: 12,
-                      color: Colors.red,
-                      backgroundColor: Colors.white10,
-                    ),
-                  ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '$_remainingSeconds',
-                        style: const TextStyle(
-                          fontSize: 56,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const Text(
-                        'secondes',
-                        style: TextStyle(color: Colors.white54, fontSize: 14),
-                      ),
-                    ],
+        child: Stack(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color:
+                    const Color(0xFF1A1A1A), // Fond sombre pour contraste max
+                borderRadius: BorderRadius.circular(28),
+                border:
+                    Border.all(color: Colors.red.withOpacity(0.5), width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withOpacity(0.4),
+                    blurRadius: 30,
+                    spreadRadius: 10,
                   ),
                 ],
               ),
-
-              const SizedBox(height: 32),
-
-              const Text(
-                'Aide en route si vous ne répondez pas.',
-                style: TextStyle(
-                  color: Colors.redAccent,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Bouton JE VAIS BIEN (Action Primaire)
-              ElevatedButton(
-                onPressed: _cancelEmergency,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade600,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(80),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildPulsingIcon(),
+                  const SizedBox(height: 20),
+                  Text(
+                    _remainingSeconds > 0
+                        ? 'ALERTE CRITIQUE'
+                        : 'ALERTE ENVOYÉE',
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 1.2,
+                    ),
                   ),
-                  elevation: 8,
-                ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'JE VAIS BIEN',
-                      style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Un état critique a été détecté :\n"${widget.stateDescription}"',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      color: Colors.white70,
+                      height: 1.4,
                     ),
-                    Text(
-                      '(Annuler l\'alerte)',
-                      style: TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.normal),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Compteur circulaire haute visibilité
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 140,
+                        height: 140,
+                        child: CircularProgressIndicator(
+                          value: _remainingSeconds / 20,
+                          strokeWidth: 12,
+                          color: Colors.red,
+                          backgroundColor: Colors.white10,
+                        ),
+                      ),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$_remainingSeconds',
+                            style: const TextStyle(
+                              fontSize: 56,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const Text(
+                            'secondes',
+                            style:
+                                TextStyle(color: Colors.white54, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  Text(
+                    _remainingSeconds > 0
+                        ? 'Aide en route si vous ne répondez pas.'
+                        : 'Vos proches ont été prévenus.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
-                  ],
-                ),
-              ),
+                  ),
 
-              const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
-              // Option vocale
-              TextButton.icon(
-                onPressed: () {
-                  // Ici on pourrait forcer l'ouverture du micro pour parler
-                  HapticFeedback.mediumImpact();
-                },
-                icon: const Icon(Icons.mic, color: Colors.blueAccent),
-                label: const Text(
-                  'Parler pour préciser mon état',
-                  style: TextStyle(color: Colors.blueAccent, fontSize: 16),
-                ),
+                  // Bouton JE VAIS BIEN (Action Primaire)
+                  ElevatedButton(
+                    onPressed: _cancelEmergency,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade600,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(80),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      elevation: 8,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _remainingSeconds > 0 ? 'JE VAIS BIEN' : 'FERMER',
+                          style: const TextStyle(
+                              fontSize: 24, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          _remainingSeconds > 0
+                              ? '(Annuler l\'alerte)'
+                              : '(Alerte envoyée)',
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.normal),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Option vocale
+                  TextButton.icon(
+                    onPressed: () {
+                      // Ici on pourrait forcer l'ouverture du micro pour parler
+                      HapticFeedback.mediumImpact();
+                    },
+                    icon: const Icon(Icons.mic, color: Colors.blueAccent),
+                    label: const Text(
+                      'Parler pour préciser mon état',
+                      style: TextStyle(color: Colors.blueAccent, fontSize: 16),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white54),
+                onPressed: _cancelEmergency,
+              ),
+            ),
+          ],
         ),
       ),
     );

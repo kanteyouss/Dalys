@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'dart:math';
 import '../models/message_chatbot.dart';
 import '../models/health_data.dart';
@@ -257,6 +258,17 @@ class ServiceChatbot {
 
   bool _contientMotCle(String texte, List<String> motsCles) {
     return motsCles.any((mot) => texte.contains(mot));
+  }
+
+  /// Envoie un message proactif de la part de l'assistant
+  Future<void> envoyerMessageProactif(String texte,
+      {List<String>? quickReplies}) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+
+    final message = MessageChatbot.assistant(texte, quickReplies: quickReplies);
+    await _serviceHistorique.sauvegarderMessage(message, userId);
+    debugPrint('🤖 Message proactif envoyé : $texte');
   }
 
   /// Efface l'historique
