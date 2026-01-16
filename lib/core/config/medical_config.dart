@@ -13,5 +13,5 @@ class MedicalConfig {
   static const double pefWarning = 350.0;
 
   // Paramètres d'urgence
-  static const int emergencyCountdownSeconds = 20;
+  static const int emergencyCountdownSeconds = 10;
 }

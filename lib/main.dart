@@ -16,6 +16,7 @@ import 'data/services/auth_service.dart';
 import 'data/services/service_reconnaissance_vocale.dart';
 import 'data/services/service_vocal.dart';
 import 'data/models/modele_alerte.dart';
+import 'data/services/medication_service.dart';
 
 // Note: If AppLocalizations is not generated yet, this might cause a lint error.
 // We keep it as it was in the original file.
@@ -47,8 +48,14 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider(create: (_) => AuthService()),
-        ChangeNotifierProvider(
+        ChangeNotifierProvider(create: (_) => MedicationService()),
+        ChangeNotifierProxyProvider<MedicationService, ControleurAlertes>(
           create: (_) => ControleurAlertes()..initialiser(),
+          update: (_, medicationService, alertController) {
+            alertController ??= ControleurAlertes()..initialiser();
+            alertController.setMedicationService(medicationService);
+            return alertController;
+          },
         ),
         ChangeNotifierProxyProvider<ControleurAlertes, HealthController>(
           create: (_) => HealthController(),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../controllers/health_controller.dart';
+import 'package:dalys/data/services/service_vocal.dart';
+import 'package:dalys/data/models/modele_alerte.dart';
 
 class AddMeasurementDialog extends StatefulWidget {
   const AddMeasurementDialog({super.key});
@@ -297,6 +299,9 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
       final breathingRate = int.parse(_breathingRateController.text);
       final pef = double.parse(_pefController.text);
 
+      // Vérifier si c'est un état très critique
+      final isVeryCritical = spo2 < 90;
+
       context.read<HealthController>().addManualMeasurement(
             spo2: spo2,
             breathingRate: breathingRate,
@@ -322,8 +327,236 @@ class _AddMeasurementDialogState extends State<AddMeasurementDialog> {
       );
 
       Navigator.of(context).pop();
+
+      // Afficher les instructions si état très critique
+      if (isVeryCritical) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _showCriticalStateInstructions(context, spo2);
+        });
+      }
     } else {
       HapticFeedback.vibrate();
     }
+  }
+
+  void _showCriticalStateInstructions(BuildContext context, int spo2) {
+    // Lire les instructions vocalement
+    _speakInstructions(spo2);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.red.shade50,
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red.shade700, size: 32),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                '⚠️ ÉTAT CRITIQUE DÉTECTÉ',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Votre saturation en oxygène est très basse ($spo2%)',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '📋 INSTRUCTIONS IMMÉDIATES :',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildInstructionItem('1', 'Asseyez-vous et restez calme'),
+              _buildInstructionItem('2', 'EXERCICE : Respiration en carré'),
+              Padding(
+                padding: const EdgeInsets.only(left: 36, bottom: 8),
+                child: Text(
+                  '• Inspirez par le nez - 4 secondes\n'
+                  '• Retenez votre souffle - 4 secondes\n'
+                  '• Expirez par la bouche - 4 secondes\n'
+                  '• Pause poumons vides - 4 secondes\n'
+                  '→ Répétez 5 fois minimum',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+              _buildInstructionItem(
+                  '3', 'Utilisez votre inhalateur si prescrit'),
+              _buildInstructionItem(
+                  '4', 'Vos contacts d\'urgence ont été alertés'),
+              _buildInstructionItem(
+                  '5', 'Si aucune amélioration : appelez le 15'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue.shade700),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Des emails d\'urgence ont été envoyés automatiquement',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('J\'ai compris'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/respiration');
+            },
+            icon: const Icon(Icons.air),
+            label: const Text('Exercices guidés'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              foregroundColor: Colors.white,
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            icon: const Icon(Icons.call),
+            label: const Text('Appeler le 15'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstructionItem(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: Colors.red.shade700,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 15),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Lit les instructions vocalement pour les états critiques
+  Future<void> _speakInstructions(int spo2) async {
+    final vocalService = ServiceVocal();
+
+    // Message d'alerte initial
+    await vocalService.parler(
+      'Attention. État critique détecté. Votre saturation en oxygène est de $spo2 pourcent.',
+      niveau: NiveauNotification.urgence,
+    );
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Instructions étape par étape
+    await vocalService.parler(
+      'Instruction numéro 1. Asseyez-vous et restez calme.',
+      niveau: NiveauNotification.urgence,
+    );
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    await vocalService.parler(
+      'Instruction numéro 2. Exercice de respiration en carré. '
+      'Inspirez par le nez pendant 4 secondes. '
+      'Retenez votre souffle pendant 4 secondes. '
+      'Expirez par la bouche pendant 4 secondes. '
+      'Pause poumons vides pendant 4 secondes. '
+      'Répétez 5 fois minimum.',
+      niveau: NiveauNotification.prevention,
+    );
+
+    await Future.delayed(const Duration(seconds: 1));
+
+    await vocalService.parler(
+      'Instruction numéro 3. Utilisez votre inhalateur si prescrit.',
+      niveau: NiveauNotification.urgence,
+    );
+
+    await Future.delayed(const Duration(seconds: 1));
+
+    await vocalService.parler(
+      'Vos contacts d\'urgence ont été alertés automatiquement.',
+      niveau: NiveauNotification.alerte,
+    );
+
+    await Future.delayed(const Duration(seconds: 1));
+
+    await vocalService.parler(
+      'Si aucune amélioration, appelez le 15 immédiatement.',
+      niveau: NiveauNotification.urgence,
+    );
   }
 }

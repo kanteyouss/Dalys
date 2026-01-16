@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:dalys/data/models/modele_alerte.dart';
 import 'package:dalys/data/services/auth_service.dart';
 import 'package:dalys/data/services/emergency_service.dart';
-import 'package:dalys/core/config/medical_config.dart';
+import 'package:dalys/data/services/medication_service.dart';
+import '../services/service_ia.dart';
 
 /// Événement d'urgence pour la communication avec l'UI
 class EmergencyEvent {
@@ -14,11 +15,14 @@ class EmergencyEvent {
 
 /// Contrôleur principal pour la gestion des alertes médicales et environnementales
 class ControleurAlertes extends ChangeNotifier {
+  DateTime? _lastEmergencyTrigger;
+  static const Duration _emergencyCooldown = Duration(minutes: 1);
   final AuthService _authService = AuthService();
   final List<ModeleAlerte> _listeAlertes = [];
   bool _estEnChargement = false;
   String? _messageErreur;
   bool _estEnModeSimulation = true;
+  MedicationService? _medicationService;
 
   // Filtres et recherche
   Set<TypeAlerte> _filtresType = {};
@@ -92,6 +96,18 @@ class ControleurAlertes extends ChangeNotifier {
       if (_estEnModeSimulation && _listeAlertes.isEmpty) {
         await genererDonneesDemo();
       }
+
+      // S'abonner aux urgences
+      EmergencyService().onEmergency.listen((description) {
+        _creerAlerteSiNecessaire(
+          idPrefix: 'emergency_auto',
+          titre: '🚨 URGENCE DÉCLENCHÉE',
+          description: description,
+          type: TypeAlerte.critique,
+          priorite: 100,
+          tags: ['urgence', 'sos', 'automatique'],
+        );
+      });
     } catch (e) {
       _messageErreur = e.toString();
     } finally {
@@ -110,14 +126,23 @@ class ControleurAlertes extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setMedicationService(MedicationService service) {
+    _medicationService = service;
+  }
+
   void _gererAlerteCritique(ModeleAlerte alerte) {
     _emergencyStreamController
         .add(EmergencyEvent(alerte.titre, alerte.description));
     debugPrint('🚨 Alerte critique détectée: ${alerte.titre}');
   }
 
-  void analyserDonneesSante(dynamic healthData) {
-    if (healthData.spo2 < MedicalConfig.spo2Critical) {
+  Future<void> analyserDonneesSante(dynamic healthData) async {
+    debugPrint(
+        '🔍 ControleurAlertes: analyserDonneesSante() appelé avec SpO2=${healthData.spo2}');
+
+    // Vérifier les niveaux critiques
+    if (healthData.spo2 < 92) {
+      debugPrint('⚠️ ControleurAlertes: Niveau critique détecté (SpO2 < 92)');
       _creerAlerteSiNecessaire(
         idPrefix: 'auto_spo2',
         titre: 'Niveau d\'oxygène critique',
@@ -127,6 +152,40 @@ class ControleurAlertes extends ChangeNotifier {
         priorite: 90,
         tags: ['santé', 'urgence', 'spo2'],
       );
+
+      // ENVOI AUTOMATIQUE pour les cas TRÈS critiques (SpO2 < 90)
+      if (healthData.spo2 < 90) {
+        debugPrint(
+            '🚨 ControleurAlertes: TRÈS CRITIQUE (SpO2 < 90) - Déclenchement automatique!');
+        await _triggerAutomaticEmergency(
+          'Saturation en oxygène très basse : ${healthData.spo2}%',
+          healthData,
+        );
+      } else {
+        debugPrint(
+            'ℹ️ ControleurAlertes: Critique mais pas < 90%, pas d\'envoi automatique');
+      }
+    } else {
+      debugPrint(
+          '✅ ControleurAlertes: Niveau normal (SpO2 >= 92), pas d\'alerte');
+    }
+
+    // Analyse IA avancée (Observance + Santé)
+    if (_medicationService != null) {
+      final iaAlertes = await ServiceIA().analyserObservanceEtSante(
+        _medicationService!.medications,
+        {
+          'spo2': healthData.spo2.toDouble(),
+          'pef': healthData.pef.toDouble(),
+        },
+      );
+
+      for (var alerte in iaAlertes) {
+        // Ajouter l'alerte si elle n'existe pas déjà (basé sur l'ID ou le type/date récente)
+        // Pour simplifier, on ajoute directement
+        ajouterAlerte(
+            alerte.copierAvec(idUtilisateur: _currentUserId.toString()));
+      }
     }
   }
 
@@ -153,6 +212,40 @@ class ControleurAlertes extends ChangeNotifier {
       idUtilisateur: userId.toString(),
     );
     ajouterAlerte(nouvelleAlerte);
+  }
+
+  /// Déclenche automatiquement le protocole d'urgence pour les cas très critiques
+  Future<void> _triggerAutomaticEmergency(
+      String stateDescription, dynamic healthData) async {
+    // Vérifier le cooldown pour éviter les envois multiples
+    final now = DateTime.now();
+    if (_lastEmergencyTrigger != null) {
+      final timeSinceLastTrigger = now.difference(_lastEmergencyTrigger!);
+      if (timeSinceLastTrigger < _emergencyCooldown) {
+        debugPrint(
+            '⚠️ Urgence automatique ignorée (cooldown actif: ${_emergencyCooldown.inMinutes - timeSinceLastTrigger.inMinutes} min restantes)');
+        return;
+      }
+    }
+
+    // Récupérer l'utilisateur actuel
+    final user = _authService.currentUser;
+    if (user == null) {
+      debugPrint(
+          '❌ Impossible de déclencher l\'urgence: utilisateur non connecté');
+      return;
+    }
+
+    debugPrint('🚨 DÉCLENCHEMENT AUTOMATIQUE D\'URGENCE - $stateDescription');
+    _lastEmergencyTrigger = now;
+
+    // Déclencher le protocole d'urgence SANS compte à rebours
+    await EmergencyService().triggerEmergencyProtocol(
+      user,
+      stateDescription,
+      recentHistory: healthData != null ? [healthData] : null,
+      isAutomatic: true, // ← IMPORTANT : Marquer comme automatique
+    );
   }
 
   void definirTermeRecherche(String terme) {

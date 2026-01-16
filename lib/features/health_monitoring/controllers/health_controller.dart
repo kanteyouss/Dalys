@@ -250,6 +250,15 @@ class HealthController extends ChangeNotifier {
       _historicalData.removeAt(0);
     }
 
+    // Analyser pour les alertes si le contrôleur est lié
+    if (_controleurAlertes != null) {
+      try {
+        _controleurAlertes.analyserDonneesSante(newData);
+      } catch (e) {
+        debugPrint('Erreur lors de l\'analyse des alertes: $e');
+      }
+    }
+
     notifyListeners();
   }
 

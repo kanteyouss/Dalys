@@ -40,7 +40,7 @@ class EmergencyCountdownOverlay extends StatefulWidget {
 }
 
 class _EmergencyCountdownOverlayState extends State<EmergencyCountdownOverlay> {
-  int _remainingSeconds = 20;
+  int _remainingSeconds = 10;
   final EmergencyService _emergencyService = EmergencyService();
   final ServiceReconnaissanceVocale _voiceService =
       ServiceReconnaissanceVocale();
@@ -153,7 +153,7 @@ class _EmergencyCountdownOverlayState extends State<EmergencyCountdownOverlay> {
                         width: 140,
                         height: 140,
                         child: CircularProgressIndicator(
-                          value: _remainingSeconds / 20,
+                          value: _remainingSeconds / 10,
                           strokeWidth: 12,
                           color: Colors.red,
                           backgroundColor: Colors.white10,

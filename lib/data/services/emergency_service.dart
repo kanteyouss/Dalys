@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/user_model.dart';
 import 'service_vocal.dart';
 import 'service_email.dart';
@@ -21,6 +22,10 @@ class EmergencyService {
   Position? _lastPosition;
 
   bool get isEmergencyPending => _isEmergencyPending;
+
+  // Stream pour notifier les autres composants (ex: ControleurAlertes) d'une urgence
+  final _onEmergencyTriggered = StreamController<String>.broadcast();
+  Stream<String> get onEmergency => _onEmergencyTriggered.stream;
 
   /// Déclenche le protocole d'urgence avec un compte à rebours
   void triggerEmergencyWithCountdown(UserModel user, String stateDescription,
@@ -85,11 +90,21 @@ class EmergencyService {
 
   /// Déclenche le protocole d'urgence (immédiat)
   Future<void> triggerEmergencyProtocol(UserModel user, String stateDescription,
-      {List<HealthData>? recentHistory, String? intendedDestination}) async {
+      {List<HealthData>? recentHistory,
+      String? intendedDestination,
+      bool isAutomatic = false}) async {
     debugPrint('🚨 PROTOCOLE D\'URGENCE DÉCLENCHÉ 🚨');
+    debugPrint(isAutomatic ? '🤖 Type: AUTOMATIQUE' : '👤 Type: MANUEL');
 
     // 1. Activation automatique de la localisation et récupération de la position
+    // Essayer plusieurs fois pour augmenter les chances d'obtenir la position
     _lastPosition = await _getCurrentLocation();
+    if (_lastPosition == null) {
+      debugPrint(
+          '⚠️ Première tentative de localisation échouée, nouvelle tentative...');
+      await Future.delayed(const Duration(seconds: 2));
+      _lastPosition = await _getCurrentLocation();
+    }
 
     // 2. Démarrage du suivi en temps réel
     _startLocationTracking(user);
@@ -99,7 +114,12 @@ class EmergencyService {
 
     // 4. Envoi d'alertes aux contacts (Médecin, Hôpital, Proche)
     await _sendAlertsToContacts(user, _lastPosition, stateDescription,
-        recentHistory: recentHistory, intendedDestination: intendedDestination);
+        recentHistory: recentHistory,
+        intendedDestination: intendedDestination,
+        isAutomatic: isAutomatic);
+
+    // 5. Notifier les abonnés internes (ex: Historique des notifications)
+    _onEmergencyTriggered.add(stateDescription);
   }
 
   Future<Position?> _getCurrentLocation() async {
@@ -199,7 +219,9 @@ class EmergencyService {
 
   Future<void> _sendAlertsToContacts(
       UserModel user, Position? position, String state,
-      {List<HealthData>? recentHistory, String? intendedDestination}) async {
+      {List<HealthData>? recentHistory,
+      String? intendedDestination,
+      bool isAutomatic = false}) async {
     final now = DateTime.now();
     final timeStr =
         "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
@@ -208,66 +230,106 @@ class EmergencyService {
         ? 'https://www.google.com/maps/search/?api=1&query=${position.latitude},${position.longitude}'
         : '';
 
+    final alertType =
+        isAutomatic ? '🤖 ALERTE AUTOMATIQUE' : '👤 ALERTE MANUELLE';
+    final alertTypeShort = isAutomatic ? 'Auto' : 'Manuel';
+
     // 1. Envoi au Proche (Rassurant, Actions simples)
-    if (user.emergencyContactEmail != null) {
-      debugPrint('📧 Envoi email PROCHE à ${user.emergencyContactEmail}...');
-      final htmlBody =
-          _generateRelativeEmail(user, position, state, timeStr, googleMapsUrl);
+    if (user.emergencyContactEmail != null &&
+        user.emergencyContactEmail!.isNotEmpty) {
+      debugPrint(
+          '📧 Préparation email PROCHE à ${user.emergencyContactEmail}...');
+      final htmlBody = _generateRelativeEmail(
+          user, position, state, timeStr, googleMapsUrl, alertType);
       final plainBody =
-          "URGENCE : ${user.prenom} a besoin d'aide. État : $state. Tel : ${user.telephone}";
+          "[$alertTypeShort] URGENCE : ${user.prenom} a besoin d'aide. État : $state. Tel : ${user.telephone}";
 
       await EmailService().sendEmergencyEmail(
         recipientEmail: user.emergencyContactEmail!,
-        subject: '🚨 URGENCE : ${user.prenom} ${user.nom} a besoin d\'aide',
+        subject:
+            '[$alertTypeShort] 🚨 URGENCE : ${user.prenom} ${user.nom} a besoin d\'aide',
         body: plainBody,
         html: htmlBody,
       );
+    } else {
+      debugPrint('⚠️ Pas d\'email de contact d\'urgence configuré');
     }
 
     // 2. Envoi au Médecin (Données médicales, État clinique)
-    if (user.doctorEmail != null) {
-      debugPrint('📧 Envoi email MÉDECIN à ${user.doctorEmail}...');
-      final htmlBody = _generateDoctorEmail(
-          user, position, state, timeStr, googleMapsUrl, recentHistory);
+    if (user.doctorEmail != null && user.doctorEmail!.isNotEmpty) {
+      debugPrint('📧 Préparation email MÉDECIN à ${user.doctorEmail}...');
+      final htmlBody = _generateDoctorEmail(user, position, state, timeStr,
+          googleMapsUrl, alertType, recentHistory);
       final plainBody =
-          "ALERTE MÉDICALE : Patient ${user.nom} ${user.prenom}. État : $state.";
+          "[$alertTypeShort] ALERTE MÉDICALE : Patient ${user.nom} ${user.prenom}. État : $state.";
 
       await EmailService().sendEmergencyEmail(
         recipientEmail: user.doctorEmail!,
-        subject: 'URGENCE MÉDICALE : Patient ${user.nom} ${user.prenom}',
+        subject:
+            '[$alertTypeShort] URGENCE MÉDICALE : Patient ${user.nom} ${user.prenom}',
         body: plainBody,
         html: htmlBody,
       );
+    } else {
+      debugPrint('⚠️ Pas d\'email de médecin configuré');
     }
 
     // 3. Envoi à l'Hôpital (Localisation précise, Identité)
-    if (user.hospitalEmail != null) {
-      debugPrint('📧 Envoi email HÔPITAL à ${user.hospitalEmail}...');
+    if (user.hospitalEmail != null && user.hospitalEmail!.isNotEmpty) {
+      debugPrint('📧 Préparation email HÔPITAL à ${user.hospitalEmail}...');
       final htmlBody = _generateHospitalEmail(user, position, state, timeStr,
-          googleMapsUrl, intendedDestination, recentHistory);
+          googleMapsUrl, alertType, intendedDestination, recentHistory);
       final plainBody =
-          "ADMISSION URGENCE : ${user.nom} ${user.prenom}. Localisation : $googleMapsUrl";
+          "[$alertTypeShort] ADMISSION URGENCE : ${user.nom} ${user.prenom}. Localisation : $googleMapsUrl";
 
       await EmailService().sendEmergencyEmail(
         recipientEmail: user.hospitalEmail!,
-        subject: 'ADMISSION URGENCE : ${user.nom} ${user.prenom}',
+        subject:
+            '[$alertTypeShort] ADMISSION URGENCE : ${user.nom} ${user.prenom}',
         body: plainBody,
         html: htmlBody,
       );
+    } else {
+      debugPrint('⚠️ Pas d\'email d\'hôpital configuré');
     }
 
     // SMS au proche (toujours envoyé si numéro dispo)
     if (user.emergencyContactPhone != null) {
-      debugPrint(
-          '📱 SMS simulé vers ${user.emergencyContactPhone} : URGENCE DALYS - ${user.prenom} est en danger ($state).');
+      final message = "URGENCE DALYS - ${user.prenom} est en danger ($state).";
+
+      if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+        debugPrint(
+            '🖥️ SMS (Simulation Desktop) vers ${user.emergencyContactPhone} : $message');
+      } else {
+        try {
+          // Sur mobile, cela ouvre l'application SMS par défaut avec le message pré-rempli
+          final Uri smsUri = Uri(
+            scheme: 'sms',
+            path: user.emergencyContactPhone!,
+            queryParameters: {'body': message},
+          );
+
+          if (await canLaunchUrl(smsUri)) {
+            await launchUrl(smsUri);
+            debugPrint('📱 SMS app opened successfully');
+          } else {
+            debugPrint('❌ Cannot launch SMS app');
+          }
+        } catch (e) {
+          debugPrint('❌ Exception SMS : $e');
+        }
+      }
     }
   }
 
   String _generateRelativeEmail(UserModel user, Position? position,
-      String state, String timeStr, String mapUrl) {
+      String state, String timeStr, String mapUrl, String alertType) {
     return '''
       <div style="font-family: sans-serif; border: 2px solid #e53935; padding: 20px; border-radius: 10px;">
         <h2 style="color: #e53935; margin-top: 0;">🚨 ALERTE PROCHE</h2>
+        <div style="background: #fff3cd; padding: 10px; border-radius: 5px; border-left: 4px solid #ff9800; margin-bottom: 15px;">
+          <strong>$alertType</strong>
+        </div>
         <p><strong>${user.prenom}</strong> a déclenché une alerte d'urgence.</p>
         <div style="background: #ffebee; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <p style="margin:0;"><strong>Ce qu'il se passe :</strong> $state</p>
@@ -276,18 +338,24 @@ class EmergencyService {
         <p><strong>Son téléphone :</strong> <a href="tel:${user.telephone}">${user.telephone ?? "Non renseigné"}</a></p>
         
         <div style="margin-top: 20px;">
-          ${position != null ? '<a href="$mapUrl" style="background: #d32f2f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">VOIR SA POSITION</a>' : '<p>Localisation en cours...</p>'}
+          ${position != null ? '<a href="$mapUrl" style="background: #d32f2f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">VOIR SA POSITION</a><p style="margin-top: 10px; font-size: 12px; color: #666;">GPS: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}</p>' : '<p style="color: #ff9800; font-weight: bold;">⚠️ Localisation GPS non disponible</p><p style="font-size: 12px; color: #666;">Le service de localisation n\'a pas pu obtenir la position</p>'}
         </div>
         <p style="color: #757575; font-size: 12px; margin-top: 30px;">Envoyé via DALYS - Prévention Respiratoire</p>
       </div>
     ''';
   }
 
-  String _generateDoctorEmail(UserModel user, Position? position, String state,
-      String timeStr, String mapUrl, List<HealthData>? history) {
+  String _generateDoctorEmail(
+      UserModel user,
+      Position? position,
+      String state,
+      String timeStr,
+      String mapUrl,
+      String alertType,
+      List<HealthData>? recentHistory) {
     String historyTable = '';
-    if (history != null && history.isNotEmpty) {
-      final recent = history.take(5).toList();
+    if (recentHistory != null && recentHistory.isNotEmpty) {
+      final recent = recentHistory.take(5).toList();
       historyTable = '''
         <h3>Dernières Constantes (24h)</h3>
         <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
@@ -312,6 +380,9 @@ class EmergencyService {
     return '''
       <div style="font-family: sans-serif; border: 1px solid #1976d2; padding: 20px; border-radius: 5px;">
         <h2 style="color: #1976d2; margin-top: 0;">DOSSIER PATIENT : ALERTE MÉDICALE</h2>
+        <div style="background: #e3f2fd; padding: 10px; border-radius: 5px; border-left: 4px solid #1976d2; margin-bottom: 15px;">
+          <strong>$alertType</strong>
+        </div>
         <p><strong>Patient :</strong> ${user.nom.toUpperCase()} ${user.prenom}</p>
         <hr>
         <h3>État Clinique Déclaré</h3>
@@ -322,11 +393,11 @@ class EmergencyService {
         <h3>Données Contextuelles</h3>
         <ul>
           <li><strong>Heure de l'incident :</strong> $timeStr</li>
-          <li><strong>Localisation :</strong> ${position != null ? 'Disponible (voir carte)' : 'Non disponible'}</li>
+          <li><strong>Localisation :</strong> ${position != null ? 'GPS: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}' : '⚠️ Non disponible'}</li>
         </ul>
         
         <div style="margin-top: 20px;">
-          ${position != null ? '<a href="$mapUrl" style="color: #1976d2; text-decoration: underline;">Voir la localisation du patient</a>' : ''}
+          ${position != null ? '<a href="$mapUrl" style="color: #1976d2; text-decoration: underline; font-weight: bold;">📍 Voir la localisation du patient sur Google Maps</a>' : '<p style="color: #ff9800;">⚠️ Service de localisation indisponible</p>'}
         </div>
       </div>
     ''';
@@ -338,7 +409,8 @@ class EmergencyService {
       String state,
       String timeStr,
       String mapUrl,
-      String? destination,
+      String alertType,
+      String? intendedDestination,
       List<HealthData>? history) {
     String vitalsSummary = '';
     if (history != null && history.isNotEmpty) {
@@ -353,6 +425,9 @@ class EmergencyService {
     return '''
       <div style="font-family: monospace; border: 3px solid #000; padding: 20px;">
         <h1 style="margin: 0; background: #000; color: #fff; padding: 5px;">URGENCE / ADMISSION</h1>
+        <div style="background: #fffbe6; padding: 10px; border: 2px solid #ff9800; margin: 15px 0;">
+          <strong style="font-size: 16px;">$alertType</strong>
+        </div>
         
         <div style="display: flex; justify-content: space-between; margin-top: 20px;">
           <div>
@@ -365,7 +440,7 @@ class EmergencyService {
           </div>
         </div>
 
-        ${destination != null ? '<div style="background: #ffeb3b; padding: 10px; margin: 10px 0; font-weight: bold;">DESTINATION PRÉVUE : $destination</div>' : ''}
+        ${intendedDestination != null ? '<div style="background: #ffeb3b; padding: 10px; margin: 10px 0; font-weight: bold;">DESTINATION PRÉVUE : $intendedDestination</div>' : ''}
 
         <div style="border: 1px solid #000; padding: 10px; margin: 20px 0;">
           <p style="margin: 0;"><strong>MOTIF :</strong> $state</p>
@@ -374,7 +449,7 @@ class EmergencyService {
         $vitalsSummary
 
         <p><strong>LOCALISATION ACTUELLE :</strong></p>
-        ${position != null ? '<a href="$mapUrl" style="font-size: 18px; font-weight: bold;">OUVRIR LA CARTE D\'INTERVENTION</a>' : 'NON DISPONIBLE'}
+        ${position != null ? '<a href="$mapUrl" style="font-size: 18px; font-weight: bold;">OUVRIR LA CARTE D\'INTERVENTION</a><p style="margin-top: 10px; font-size: 14px;">GPS: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}</p>' : '<p style="color: #ff9800; font-weight: bold;">⚠️ NON DISPONIBLE - Service de localisation indisponible</p>'}
         
         <p style="margin-top: 20px;"><strong>CONTACT :</strong> ${user.telephone ?? "N/A"}</p>
       </div>

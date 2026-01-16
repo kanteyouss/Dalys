@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:dalys/data/models/modele_alerte.dart';
+import '../../../data/models/medication_model.dart';
 
 /// Service pour la gestion des alertes prédictives IA
 /// Simule les appels API vers le serveur d'intelligence artificielle (Django/Flask)
@@ -216,6 +217,60 @@ class ServiceIA {
     }
 
     debugPrint('🧠 IA a généré ${alertes.length} prédictions');
+    return alertes;
+  }
+
+  /// Analyse la corrélation entre l'observance thérapeutique et l'état de santé
+  Future<List<ModeleAlerte>> analyserObservanceEtSante(
+    List<Medication> medications,
+    Map<String, dynamic> donneesPatient,
+  ) async {
+    final alertes = <ModeleAlerte>[];
+    final maintenant = DateTime.now();
+
+    // Calculer l'observance globale sur les 7 derniers jours (simulé ici par isTakenToday pour l'instant)
+    // Dans une vraie implémentation, on regarderait l'historique complet
+    int totalPrises = 0;
+    int prisesEffectuees = 0;
+
+    for (var med in medications) {
+      totalPrises++;
+      if (med.isTakenToday) prisesEffectuees++;
+    }
+
+    double observance = totalPrises > 0 ? prisesEffectuees / totalPrises : 1.0;
+    final spo2 = donneesPatient['spo2'] as double? ?? 95.0;
+    final pef = donneesPatient['pef'] as double? ?? 400.0;
+
+    // Règle de corrélation : Faible observance (< 50%) ET (SpO2 < 96% OU PEF < 350)
+    if (observance < 0.5 && (spo2 < 96 || pef < 350)) {
+      alertes.add(ModeleAlerte(
+        id: 'ia_med_corr_${maintenant.millisecondsSinceEpoch}',
+        titre: 'Corrélation : Oubli de traitement détecté',
+        description:
+            'L\'IA remarque que vous n\'avez pas pris tous vos traitements aujourd\'hui '
+            'et que vos constantes (SpO₂: ${spo2.toInt()}%, PEF: ${pef.toInt()}) sont en baisse. '
+            'La prise régulière de votre traitement est essentielle pour maintenir votre capacité respiratoire.',
+        type: TypeAlerte.ia,
+        niveauPriorite: 85,
+        dateCreation: maintenant,
+        niveauNotification: NiveauNotification.alerte,
+        donneesMedicales: {
+          'observance': observance,
+          'spo2': spo2,
+          'pef': pef,
+          'correlation_type': 'adherence_health_decline',
+        },
+        recommandations: [
+          'Vérifiez si vous avez pris vos médicaments',
+          'Consultez votre calendrier de traitement',
+          'Prenez votre traitement si oublié (selon prescription)',
+        ],
+        tags: ['ia', 'traitement', 'observance', 'correlation'],
+        source: 'IA Prédictive v2.1',
+      ));
+    }
+
     return alertes;
   }
 

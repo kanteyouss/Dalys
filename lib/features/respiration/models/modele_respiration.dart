@@ -4,6 +4,7 @@ enum TypeTechniqueRespiration {
   coherenceCardiaque,
   respirationAbdominale,
   technique478,
+  levresPincees,
 }
 
 class ModeleTechniqueRespiration {
@@ -62,6 +63,16 @@ class ModeleTechniqueRespiration {
           dureeExpiration: 8,
           couleurTheme: Colors.purple,
           icone: Icons.nightlight_round,
+        ),
+        const ModeleTechniqueRespiration(
+          nom: 'Lèvres Pincées',
+          description:
+              'Essentiel pour BPCO/Asthme. Réduit l\'essoufflement. Inspire 2s, Expire 4s.',
+          type: TypeTechniqueRespiration.levresPincees,
+          dureeInspiration: 2,
+          dureeExpiration: 4,
+          couleurTheme: Colors.orange,
+          icone: Icons.healing,
         ),
       ];
 }

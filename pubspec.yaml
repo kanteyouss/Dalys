@@ -51,6 +51,9 @@ dependencies:
   printing: ^5.13.2
   share_plus: ^10.1.0
   mailer: ^6.1.0
+  image_picker: ^1.0.7
+  table_calendar: ^3.1.2
+  url_launcher: ^6.2.5
   
   # Localisation
   flutter_localizations:

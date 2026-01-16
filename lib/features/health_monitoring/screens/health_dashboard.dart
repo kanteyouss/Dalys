@@ -5,6 +5,7 @@ import '../widgets/health_indicator_card.dart';
 import '../widgets/status_hero_section.dart';
 import '../widgets/health_chart.dart';
 import '../widgets/add_measurement_dialog.dart';
+import '../widgets/medication_card.dart';
 import '../../ai_suggestions/widgets/carte_suggestion.dart';
 import '../../../data/services/service_ia.dart';
 import '../../../data/models/modele_suggestion.dart';
@@ -175,6 +176,8 @@ class _HealthDashboardState extends State<HealthDashboard> {
                     if (currentData.temperature != null ||
                         currentData.humidity != null) ...[
                       const SizedBox(height: 24),
+                      const MedicationCard(),
+                      const SizedBox(height: 24),
                       _buildEnvironmentalSection(context, currentData),
                     ],
 
@@ -219,16 +222,6 @@ class _HealthDashboardState extends State<HealthDashboard> {
             ),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          showDialog(
-              context: context,
-              builder: (context) => const AddMeasurementDialog());
-        },
-        icon: const Icon(Icons.add_circle_outline),
-        label: const Text('Nouvelle mesure'),
-        backgroundColor: Theme.of(context).primaryColor,
       ),
     );
   }

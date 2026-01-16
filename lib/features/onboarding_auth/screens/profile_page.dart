@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import '../../../data/services/auth_service.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -26,6 +28,8 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isEditing = false;
   bool _isLoading = false;
   bool _obscurePassword = true;
+  String? _newPhotoPath;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -62,6 +66,23 @@ class _ProfilePageState extends State<ProfilePage> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    if (!_isEditing) return;
+
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          _newPhotoPath = image.path;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur lors de la sélection de l\'image: $e')),
+      );
+    }
+  }
+
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -94,6 +115,7 @@ class _ProfilePageState extends State<ProfilePage> {
       password: _passwordController.text.isEmpty
           ? currentUser.password
           : _passwordController.text,
+      photoUrl: _newPhotoPath ?? currentUser.photoUrl,
     );
 
     final success = await _authService.updateProfile(updatedUser);
@@ -154,24 +176,35 @@ class _ProfilePageState extends State<ProfilePage> {
                         children: [
                           Hero(
                             tag: 'profile_avatar',
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 10,
-                                    offset: Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: const CircleAvatar(
-                                radius: 45,
-                                backgroundColor: Colors.white,
-                                child: Icon(Icons.person,
-                                    size: 50, color: Color(0xFF2E7D8A)),
+                            child: GestureDetector(
+                              onTap: _pickImage,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      blurRadius: 10,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 45,
+                                  backgroundColor: Colors.white,
+                                  backgroundImage: _newPhotoPath != null
+                                      ? FileImage(File(_newPhotoPath!))
+                                      : (user.photoUrl != null
+                                          ? FileImage(File(user.photoUrl!))
+                                          : null) as ImageProvider?,
+                                  child: (_newPhotoPath == null &&
+                                          user.photoUrl == null)
+                                      ? const Icon(Icons.person,
+                                          size: 50, color: Color(0xFF2E7D8A))
+                                      : null,
+                                ),
                               ),
                             ),
                           ),
@@ -240,42 +273,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSectionTitle('Informations Personnelles'),
-                    _buildCard([
-                      _buildTextField(
-                        controller: _prenomController,
-                        label: 'Prénom',
-                        icon: Icons.person_outline,
-                        enabled: _isEditing,
-                      ),
-                      const Divider(height: 32),
-                      _buildTextField(
-                        controller: _nomController,
-                        label: 'Nom',
-                        icon: Icons.person_outline,
-                        enabled: _isEditing,
-                      ),
-                    ]),
-                    const SizedBox(height: 24),
-                    _buildSectionTitle('Contact'),
-                    _buildCard([
-                      _buildTextField(
-                        controller: _emailController,
-                        label: 'Email',
-                        icon: Icons.email_outlined,
-                        enabled: _isEditing,
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const Divider(height: 32),
-                      _buildTextField(
-                        controller: _phoneController,
-                        label: 'Téléphone',
-                        icon: Icons.phone_outlined,
-                        enabled: _isEditing,
-                        keyboardType: TextInputType.phone,
-                      ),
-                    ]),
-                    const SizedBox(height: 32),
                     _buildSectionTitle('Urgence'),
                     _buildCard([
                       _buildTextField(
@@ -319,6 +316,44 @@ class _ProfilePageState extends State<ProfilePage> {
                         validator: (value) => null, // Optionnel
                       ),
                     ]),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle('Informations Personnelles'),
+                    _buildCard([
+                      _buildTextField(
+                        controller: _prenomController,
+                        label: 'Prénom',
+                        icon: Icons.person_outline,
+                        enabled: _isEditing,
+                      ),
+                      const Divider(height: 32),
+                      _buildTextField(
+                        controller: _nomController,
+                        label: 'Nom',
+                        icon: Icons.person_outline,
+                        enabled: _isEditing,
+                      ),
+                    ]),
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Contact'),
+                    _buildCard([
+                      _buildTextField(
+                        controller: _emailController,
+                        label: 'Email',
+                        icon: Icons.email_outlined,
+                        enabled: _isEditing,
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const Divider(height: 32),
+                      _buildTextField(
+                        controller: _phoneController,
+                        label: 'Téléphone',
+                        icon: Icons.phone_outlined,
+                        enabled: _isEditing,
+                        keyboardType: TextInputType.phone,
+                      ),
+                    ]),
+                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
                     const SizedBox(height: 24),
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 300),

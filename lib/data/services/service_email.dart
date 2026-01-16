@@ -8,17 +8,22 @@ class EmailService {
   factory EmailService() => _instance;
   EmailService._internal();
 
-  /// Envoie un email d'urgence
   Future<bool> sendEmergencyEmail({
     required String recipientEmail,
     required String subject,
     required String body,
     String? html,
   }) async {
+    debugPrint('📧 === TENTATIVE D\'ENVOI D\'EMAIL ===');
+    debugPrint('📧 Destinataire: $recipientEmail');
+    debugPrint('📧 Sujet: $subject');
+    debugPrint('📧 Expéditeur: ${EmailConfig.senderEmail}');
+    debugPrint('📧 Serveur SMTP: ${EmailConfig.smtpServer}');
+
     if (EmailConfig.appPassword == 'mxvp htoi fgpg pemn' ||
         EmailConfig.appPassword == 'VOTRE_CODE_DE_16_CARACTERES') {
-      // Note: I'm keeping the check but allowing the user's current password for now.
-      // In a real app, we'd have a better check.
+      debugPrint(
+          '⚠️ ATTENTION: Mot de passe d\'application par défaut détecté!');
     }
 
     final smtpServer = gmail(EmailConfig.senderEmail, EmailConfig.appPassword);
@@ -34,17 +39,21 @@ class EmailService {
     }
 
     try {
+      debugPrint('📧 Connexion au serveur SMTP...');
       final sendReport = await send(message, smtpServer);
-      debugPrint('📧 Email envoyé avec succès : ${sendReport.toString()}');
+      debugPrint('✅ Email envoyé avec succès!');
+      debugPrint('📧 Rapport: ${sendReport.toString()}');
       return true;
     } on MailerException catch (e) {
-      debugPrint('❌ Erreur lors de l\'envoi de l\'email : $e');
+      debugPrint('❌ ERREUR MAILER: $e');
+      debugPrint('❌ Type d\'erreur: ${e.runtimeType}');
       for (var p in e.problems) {
-        debugPrint('Problem: ${p.code}: ${p.msg}');
+        debugPrint('❌ Problème [${p.code}]: ${p.msg}');
       }
       return false;
     } catch (e) {
-      debugPrint('❌ Erreur inattendue lors de l\'envoi de l\'email : $e');
+      debugPrint('❌ ERREUR INATTENDUE: $e');
+      debugPrint('❌ Type: ${e.runtimeType}');
       return false;
     }
   }

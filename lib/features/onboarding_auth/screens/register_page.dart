@@ -16,6 +16,10 @@ class _RegisterPageState extends State<RegisterPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emergencyContactNameController = TextEditingController();
+  final _emergencyContactPhoneController = TextEditingController();
+  final _doctorEmailController = TextEditingController();
+  final _hospitalEmailController = TextEditingController();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -29,6 +33,10 @@ class _RegisterPageState extends State<RegisterPage> {
     _emailController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
+    _emergencyContactNameController.dispose();
+    _emergencyContactPhoneController.dispose();
+    _doctorEmailController.dispose();
+    _hospitalEmailController.dispose();
     super.dispose();
   }
 
@@ -45,6 +53,19 @@ class _RegisterPageState extends State<RegisterPage> {
       telephone: _phoneController.text.trim().isEmpty
           ? null
           : _phoneController.text.trim(),
+      emergencyContactName: _emergencyContactNameController.text.trim().isEmpty
+          ? null
+          : _emergencyContactNameController.text.trim(),
+      emergencyContactPhone:
+          _emergencyContactPhoneController.text.trim().isEmpty
+              ? null
+              : _emergencyContactPhoneController.text.trim(),
+      doctorEmail: _doctorEmailController.text.trim().isEmpty
+          ? null
+          : _doctorEmailController.text.trim(),
+      hospitalEmail: _hospitalEmailController.text.trim().isEmpty
+          ? null
+          : _hospitalEmailController.text.trim(),
     );
 
     final success = await _authService.register(user);
@@ -181,6 +202,61 @@ class _RegisterPageState extends State<RegisterPage> {
                   if (value.length < 6) return 'Minimum 6 caractères';
                   return null;
                 },
+              ),
+              const SizedBox(height: 24),
+
+              // Section Contact d'urgence
+              const Divider(),
+              const Text(
+                'Contact d\'urgence (Optionnel)',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _emergencyContactNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nom du contact d\'urgence',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.contact_emergency),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _emergencyContactPhoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Téléphone du contact d\'urgence',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 24),
+
+              // Section Contacts médicaux
+              const Divider(),
+              const Text(
+                'Contacts médicaux (Optionnel)',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _doctorEmailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email du médecin',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.medical_services),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _hospitalEmailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email de l\'hôpital',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.local_hospital),
+                ),
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 32),
 

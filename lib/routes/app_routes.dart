@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../features/health_monitoring/screens/health_dashboard.dart';
 import '../features/navigation/main_scaffold.dart';
 import '../features/alertes/screens/page_alertes.dart';
 import '../features/alertes/screens/page_detail_alerte.dart';
@@ -9,9 +8,11 @@ import '../features/data_sharing/screens/share_center.dart';
 import '../features/onboarding_auth/screens/login_page.dart';
 import '../features/onboarding_auth/screens/register_page.dart';
 import '../features/onboarding_auth/screens/profile_page.dart';
+import '../features/debug/email_test_page.dart';
 import '../features/health_monitoring/screens/health_history_page.dart';
 import '../features/respiration/screens/ecran_respiration.dart';
 import '../data/models/modele_alerte.dart';
+import '../features/health_monitoring/screens/medication_page.dart';
 
 class AppRoutes {
   // Routes principales de l'application
@@ -26,6 +27,8 @@ class AppRoutes {
   static const String profil = '/profil';
   static const String historique = '/historique';
   static const String respiration = '/respiration';
+  static const String medications = '/medications';
+  static const String emailTest = '/email-test';
 
   // Routes héritées (compatibilité)
   static const String dashboard = '/dashboard';
@@ -48,6 +51,7 @@ class AppRoutes {
       profil: (context) => const ProfilePage(),
       historique: (context) => const HealthHistoryPage(),
       respiration: (context) => const EcranRespiration(),
+      medications: (context) => const MedicationPage(),
 
       // Routes héritées (compatibilité)
       dashboard: (context) => const MainScaffold(),
@@ -110,6 +114,12 @@ class AppRoutes {
       case respiration:
         return MaterialPageRoute(
             builder: (context) => const EcranRespiration());
+
+      case medications:
+        return MaterialPageRoute(builder: (context) => const MedicationPage());
+
+      case emailTest:
+        return MaterialPageRoute(builder: (context) => const EmailTestPage());
 
       default:
         return _routeErreur('Page introuvable');
