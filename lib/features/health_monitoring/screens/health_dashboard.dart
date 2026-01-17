@@ -249,7 +249,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
               history,
               currentData.breathingRate.toDouble(),
               (d) => d.breathingRate.toDouble());
-              _calculateTrend(history, currentData.pef, (d) => d.pef);
+          _calculateTrend(history, currentData.pef, (d) => d.pef);
 
           final isHighRisk = currentData.riskLevel == RiskLevel.high;
           final backgroundColor = isHighRisk
@@ -755,6 +755,8 @@ class _HealthDashboardState extends State<HealthDashboard> {
     );
   }
 
+  Widget _buildVitalsGrid(BuildContext context, HealthData currentData,
+      Trend spo2Trend, Trend breathingTrend) {
     return Column(
       children: [
         Row(
@@ -795,8 +797,9 @@ class _HealthDashboardState extends State<HealthDashboard> {
               child: HealthIndicatorCard(
                 title: 'Pouls',
                 value: '${currentData.heartRate ?? "--"} bpm',
-                icon: Icons.pulse_instrument,
-                color: currentData.isHeartRateNormal ? Colors.green : Colors.red,
+                icon: Icons.favorite,
+                color:
+                    currentData.isHeartRateNormal ? Colors.green : Colors.red,
                 normalRange: '60-100 bpm',
                 onTap: () => _showParameterDetails(
                     context, 'Pouls', '${currentData.heartRate ?? "--"} bpm'),
@@ -810,8 +813,8 @@ class _HealthDashboardState extends State<HealthDashboard> {
                 icon: Icons.speed,
                 color: currentData.isPefNormal ? Colors.green : Colors.red,
                 normalRange: '> 350 L/min',
-                onTap: () => _showParameterDetails(context, 'Souffle',
-                    '${currentData.pef.toInt()} L/min'),
+                onTap: () => _showParameterDetails(
+                    context, 'Souffle', '${currentData.pef.toInt()} L/min'),
               ),
             ),
           ],

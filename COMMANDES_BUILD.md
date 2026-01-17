@@ -64,3 +64,21 @@ flutter pub run flutter_native_splash:create
 
 ---
 *Note : Pour Android, l'APK se trouve dans `build/app/outputs/flutter-apk/`.*
+
+---
+
+## ☁️ Build iOS dans le Cloud (GitHub Actions)
+Si vous n'avez pas de Mac, utilisez cette méthode.
+
+1.  **Pousser le code sur GitHub** :
+    ```bash
+    git add .
+    git commit -m "Déclenchement build iOS"
+    git push origin feature/ios-ci
+    ```
+
+2.  **Récupérer l'application** :
+    *   Allez sur votre dépôt GitHub > Onglet **Actions**.
+    *   Cliquez sur le dernier workflow "Build iOS".
+    *   Une fois terminé (✅), téléchargez l'artefact **ios-build** en bas de page.
+
