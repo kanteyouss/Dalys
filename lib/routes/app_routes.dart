@@ -11,8 +11,10 @@ import '../features/onboarding_auth/screens/profile_page.dart';
 import '../features/debug/email_test_page.dart';
 import '../features/health_monitoring/screens/health_history_page.dart';
 import '../features/respiration/screens/ecran_respiration.dart';
+import '../features/prevention/screens/fragility_score_screen.dart';
 import '../data/models/modele_alerte.dart';
 import '../features/health_monitoring/screens/medication_page.dart';
+import '../data/services/auth_service.dart';
 
 class AppRoutes {
   // Routes principales de l'application
@@ -29,6 +31,8 @@ class AppRoutes {
   static const String respiration = '/respiration';
   static const String medications = '/medications';
   static const String emailTest = '/email-test';
+  static const String scoreSante = '/score-sante';
+  static const String fragilityScore = '/fragility-score';
 
   // Routes héritées (compatibilité)
   static const String dashboard = '/dashboard';
@@ -120,6 +124,16 @@ class AppRoutes {
 
       case emailTest:
         return MaterialPageRoute(builder: (context) => const EmailTestPage());
+
+      case scoreSante:
+      case fragilityScore:
+        final userId = AuthService().currentUser?.id;
+        if (userId != null) {
+          return MaterialPageRoute(
+            builder: (context) => FragilityScoreScreen(userId: userId),
+          );
+        }
+        return _routeErreur('Utilisateur non connecté');
 
       default:
         return _routeErreur('Page introuvable');

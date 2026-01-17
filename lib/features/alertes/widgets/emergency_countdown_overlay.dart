@@ -23,6 +23,14 @@ class EmergencyCountdownOverlay extends StatefulWidget {
 
   static void show(
       BuildContext context, UserModel user, String stateDescription) {
+    // Vérifier que le contexte a bien un Navigator
+    try {
+      Navigator.of(context);
+    } catch (e) {
+      debugPrint('❌ Erreur: Context sans Navigator actif pour EmergencyCountdownOverlay: $e');
+      return;
+    }
+    
     showDialog(
       context: context,
       barrierDismissible: false,

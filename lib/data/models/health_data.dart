@@ -12,6 +12,12 @@ class HealthData {
   final double? envTemperature; // Température ambiante (DHT22)
   final List<String> symptoms;
   final RiskLevel riskLevel;
+  
+  // Métadonnées de tendance (ajoutées pour analyse prédictive)
+  final String? trendDirection; // 'increasing', 'decreasing', 'stable'
+  final double? variability; // Écart-type calculé
+  final double? deviationFromBaseline; // Écart par rapport à la baseline personnelle
+  final Map<String, dynamic>? metadata; // Données supplémentaires
 
   HealthData({
     this.userId,
@@ -24,6 +30,10 @@ class HealthData {
     this.envTemperature,
     required this.symptoms,
     required this.riskLevel,
+    this.trendDirection,
+    this.variability,
+    this.deviationFromBaseline,
+    this.metadata,
   });
 
   factory HealthData.fromJson(Map<String, dynamic> json) {
@@ -36,11 +46,15 @@ class HealthData {
       temperature: json['temperature']?.toDouble(),
       humidity: json['humidity']?.toDouble(),
       envTemperature: json['env_temperature']?.toDouble(),
-      symptoms: List<String>.from(json['symptoms']),
+      symptoms: List<String>.from(json['symptoms'] ?? []),
       riskLevel: RiskLevel.values.firstWhere(
         (e) => e.name == json['risk_level'],
         orElse: () => RiskLevel.low,
       ),
+      trendDirection: json['trend_direction'],
+      variability: json['variability']?.toDouble(),
+      deviationFromBaseline: json['deviation_from_baseline']?.toDouble(),
+      metadata: json['metadata'] as Map<String, dynamic>?,
     );
   }
 
@@ -56,6 +70,10 @@ class HealthData {
       'env_temperature': envTemperature,
       'symptoms': symptoms,
       'risk_level': riskLevel.name,
+      'trend_direction': trendDirection,
+      'variability': variability,
+      'deviation_from_baseline': deviationFromBaseline,
+      'metadata': metadata,
     };
   }
 
@@ -70,6 +88,10 @@ class HealthData {
     double? envTemperature,
     List<String>? symptoms,
     RiskLevel? riskLevel,
+    String? trendDirection,
+    double? variability,
+    double? deviationFromBaseline,
+    Map<String, dynamic>? metadata,
   }) {
     return HealthData(
       userId: userId ?? this.userId,
@@ -82,6 +104,10 @@ class HealthData {
       envTemperature: envTemperature ?? this.envTemperature,
       symptoms: symptoms ?? this.symptoms,
       riskLevel: riskLevel ?? this.riskLevel,
+      trendDirection: trendDirection ?? this.trendDirection,
+      variability: variability ?? this.variability,
+      deviationFromBaseline: deviationFromBaseline ?? this.deviationFromBaseline,
+      metadata: metadata ?? this.metadata,
     );
   }
 

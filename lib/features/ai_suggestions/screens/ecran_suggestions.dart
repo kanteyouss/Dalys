@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../health_monitoring/controllers/health_controller.dart';
-import '../../health_monitoring/controllers/health_controller.dart';
 import '../../../data/services/service_ia.dart';
 import '../../../data/models/modele_suggestion.dart';
 import '../widgets/carte_suggestion.dart';

@@ -18,12 +18,18 @@ class DatabaseService {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'dalys_health.db');
 
-    return await openDatabase(
+    final db = await openDatabase(
       path,
-      version: 8, // Augmentation pour photo_url
+      version: 9, // Augmentation pour les nouveaux modèles prédictifs
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+    
+    // S'assurer que toutes les tables prédictives existent
+    // (résout le problème de tables manquantes après migrations partielles)
+    await _createPredictiveTables(db);
+    
+    return db;
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -85,6 +91,16 @@ class DatabaseService {
     if (oldVersion < 8) {
       await db.execute('ALTER TABLE users ADD COLUMN photo_url TEXT');
     }
+    if (oldVersion < 9) {
+      // Ajout des colonnes de tendance à health_data
+      await db.execute('ALTER TABLE health_data ADD COLUMN trend_direction TEXT');
+      await db.execute('ALTER TABLE health_data ADD COLUMN variability REAL');
+      await db.execute('ALTER TABLE health_data ADD COLUMN deviation_from_baseline REAL');
+      await db.execute('ALTER TABLE health_data ADD COLUMN metadata TEXT');
+      
+      // Nouvelles tables pour le système prédictif
+      await _createPredictiveTables(db);
+    }
   }
 
   Future<void> _createUserTable(Database db) async {
@@ -132,5 +148,93 @@ class DatabaseService {
         reponses_rapides TEXT
       )
     ''');
+  }
+  
+  Future<void> _createPredictiveTables(Database db) async {
+    // Table pour les profils de risque patients
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS patient_profiles(
+        user_id INTEGER PRIMARY KEY,
+        baseline_spo2 REAL NOT NULL,
+        baseline_breathing_rate INTEGER NOT NULL,
+        baseline_pef REAL NOT NULL,
+        patterns TEXT,
+        triggers TEXT,
+        morning_risk TEXT NOT NULL,
+        afternoon_risk TEXT NOT NULL,
+        evening_risk TEXT NOT NULL,
+        night_risk TEXT NOT NULL,
+        last_updated TEXT NOT NULL,
+        days_analyzed INTEGER NOT NULL
+      )
+    ''');
+
+    // Table pour les alertes de tendance
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS trend_alerts(
+        id TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        actions TEXT NOT NULL,
+        prevention_window_hours INTEGER,
+        timestamp TEXT NOT NULL,
+        metadata TEXT,
+        is_read INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    // Table pour les scores de fragilité
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS fragility_scores(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        value REAL NOT NULL,
+        level TEXT NOT NULL,
+        factors TEXT NOT NULL,
+        next_review_hours INTEGER NOT NULL,
+        recommendations TEXT NOT NULL,
+        timestamp TEXT NOT NULL
+      )
+    ''');
+
+    // Table pour les recommandations actionnables
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS actionable_recommendations(
+        id TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        action TEXT NOT NULL,
+        deadline TEXT NOT NULL,
+        estimated_duration_minutes INTEGER NOT NULL,
+        is_critical INTEGER NOT NULL,
+        success_criteria TEXT NOT NULL,
+        category TEXT NOT NULL,
+        priority INTEGER NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        completed_at TEXT,
+        timestamp TEXT NOT NULL
+      )
+    ''');
+
+    // Index pour améliorer les performances (IF NOT EXISTS pour éviter erreurs)
+    try {
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_trend_alerts_user ON trend_alerts(user_id, timestamp DESC)');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_fragility_scores_user ON fragility_scores(user_id, timestamp DESC)');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_recommendations_user ON actionable_recommendations(user_id, completed, deadline)');
+    } catch (e) {
+      // Index peuvent déjà exister
+      print('⚠️ Index creation skipped (may already exist): $e');
+    }
+  }
+  
+  /// Méthode publique pour s'assurer que les tables prédictives existent
+  Future<void> ensurePredictiveTablesExist() async {
+    final db = await database;
+    await _createPredictiveTables(db);
   }
 }

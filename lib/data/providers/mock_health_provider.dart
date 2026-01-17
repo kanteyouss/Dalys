@@ -22,13 +22,30 @@ class MockHealthProvider {
   // Génération de données simulées réalistes
   HealthData _generateMockData() {
     // Simulation de données réalistes avec variations
-    // 5% de chance de générer une valeur TRÈS basse (pour tester l'envoi automatique)
-    final spo2 = _random.nextDouble() < 0.05
-        ? 85 + _random.nextInt(5) // 85-89% (très critique!)
-        : 94 + _random.nextInt(6); // 94-99% (normal)
+    // 20% de chance de générer une valeur critique (pour tester l'IA)
+    final criticalChance = _random.nextDouble();
     
-    final breathingRate = 14 + _random.nextInt(8); // 14-21 bpm
-    final pef = 300.0 + _random.nextInt(200); // 300-500 L/min
+    int spo2;
+    int breathingRate;
+    double pef;
+    
+    if (criticalChance < 0.10) {
+      // 10% - État TRÈS CRITIQUE
+      spo2 = 85 + _random.nextInt(5); // 85-89%
+      breathingRate = 25 + _random.nextInt(6); // 25-30 bpm
+      pef = 150.0 + _random.nextInt(100); // 150-250 L/min
+    } else if (criticalChance < 0.25) {
+      // 15% - État critique modéré
+      spo2 = 90 + _random.nextInt(4); // 90-93%
+      breathingRate = 21 + _random.nextInt(5); // 21-25 bpm
+      pef = 250.0 + _random.nextInt(100); // 250-350 L/min
+    } else {
+      // 75% - État normal
+      spo2 = 95 + _random.nextInt(5); // 95-99%
+      breathingRate = 14 + _random.nextInt(7); // 14-20 bpm
+      pef = 350.0 + _random.nextInt(150); // 350-500 L/min
+    }
+    
     final temperature = 36.5 + _random.nextDouble(); // 36.5-37.5 °C
     final humidity = 40.0 + _random.nextInt(40); // 40-80%
     final envTemperature = 20.0 + _random.nextInt(10); // 20-30 °C

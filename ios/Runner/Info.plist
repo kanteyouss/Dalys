@@ -45,5 +45,37 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- Permissions pour la géolocalisation (urgences) -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>L'application a besoin de votre position pour vous localiser en cas d'urgence médicale et envoyer votre localisation aux secours.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>L'application a besoin d'accéder à votre position en permanence pour déclencher des alertes automatiques basées sur votre localisation (ex: risques environnementaux).</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>L'application a besoin d'accéder à votre position en arrière-plan pour surveiller votre sécurité médicale.</string>
+	
+	<!-- Permissions pour le microphone (reconnaissance vocale) -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>L'application a besoin d'accéder au microphone pour la reconnaissance vocale et les commandes mains-libres en cas d'urgence.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>L'application a besoin d'accéder à la reconnaissance vocale pour vous permettre de parler plutôt que de taper en cas d'urgence.</string>
+	
+	<!-- Permissions pour Bluetooth (capteurs ESP32) -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>L'application a besoin d'accéder au Bluetooth pour se connecter à vos capteurs médicaux (SpO2, fréquence respiratoire, souffle).</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>L'application a besoin d'accéder au Bluetooth pour communiquer avec vos appareils médicaux connectés.</string>
+	
+	<!-- Permissions pour la caméra (scan de documents) -->
+	<key>NSCameraUsageDescription</key>
+	<string>L'application a besoin d'accéder à la caméra pour scanner vos ordonnances et documents médicaux.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>L'application a besoin d'accéder à vos photos pour importer des documents médicaux.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>L'application a besoin de sauvegarder des documents médicaux dans votre galerie.</string>
+	
+	<!-- Permissions pour les rappels vocaux -->
+	<key>NSAppleMusicUsageDescription</key>
+	<string>L'application a besoin d'accéder aux services audio pour les alertes vocales d'urgence.</string>
 </dict>
 </plist>

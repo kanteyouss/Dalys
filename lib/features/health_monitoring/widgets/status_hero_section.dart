@@ -96,7 +96,7 @@ class StatusHeroSection extends StatelessWidget {
       case RiskLevel.low:
         return "Votre respiration est stable.";
       case RiskLevel.medium:
-        return "Suivez les conseils de prévention.";
+        return "Consultez vos conseils de prévention ci-dessous.";
       case RiskLevel.high:
         return "Suivez le protocole d'urgence.";
     }

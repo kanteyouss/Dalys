@@ -12,7 +12,7 @@ import 'core/theme/app_theme.dart';
 import 'features/health_monitoring/controllers/health_controller.dart';
 import 'features/alertes/controllers/controleur_alertes.dart';
 import 'features/alertes/widgets/emergency_countdown_overlay.dart';
-import 'data/services/auth_service.dart';
+import 'data/services/auth_service.dart'; 
 import 'data/services/service_reconnaissance_vocale.dart';
 import 'data/services/service_vocal.dart';
 import 'data/models/modele_alerte.dart';
@@ -110,10 +110,18 @@ class _MainWrapperState extends State<MainWrapper> {
   @override
   void initState() {
     super.initState();
+    
+    // Attendre que le widget soit monté avant d'écouter les urgences
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupEmergencyListeners();
+    });
+  }
+  
+  void _setupEmergencyListeners() {
     final alertController = context.read<ControleurAlertes>();
     _emergencySubscription = alertController.emergencyStream.listen((event) {
       final user = AuthService().currentUser;
-      if (user != null) {
+      if (user != null && mounted) {
         EmergencyCountdownOverlay.show(context, user, event.title);
       }
     });
@@ -123,7 +131,7 @@ class _MainWrapperState extends State<MainWrapper> {
     _voiceSubscription = _voiceService.wordsStream.listen((word) {
       if (_voiceService.isEmergency(word)) {
         final user = AuthService().currentUser;
-        if (user != null) {
+        if (user != null && mounted) {
           final declaredState = _voiceService.getDeclaredState(word);
           debugPrint('🎤 DÉCLENCHEMENT VOCAL D\'URGENCE : $declaredState');
 

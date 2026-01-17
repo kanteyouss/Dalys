@@ -56,4 +56,14 @@ class EnvironmentalService {
     if (aqi <= 300) return "Très mauvais";
     return "Dangereux";
   }
+
+  /// Alias pour compatibilité avec les nouveaux services
+  Future<EnvironmentalData?> getCurrentData() async {
+    try {
+      // Coordonnées par défaut (Abidjan, Côte d'Ivoire)
+      return await getLatestData(5.345317, -4.024429);
+    } catch (e) {
+      return null;
+    }
+  }
 }
