@@ -3,10 +3,12 @@ import '../../../core/enums/app_enums.dart';
 
 class StatusHeroSection extends StatelessWidget {
   final RiskLevel riskLevel;
+  final Widget? action;
 
   const StatusHeroSection({
     super.key,
     required this.riskLevel,
+    this.action,
   });
 
   @override
@@ -18,52 +20,66 @@ class StatusHeroSection extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [color.withOpacity(0.8), color],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: color.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: Colors.white, size: 48),
+            child: Icon(icon, color: Colors.white, size: 24),
           ),
-          const SizedBox(height: 16),
-          Text(
-            statusText,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  statusText,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  subText,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 12,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
-          Text(
-            subText,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 16,
-            ),
-            textAlign: TextAlign.center,
-          ),
+          if (action != null) ...[
+            const SizedBox(width: 8),
+            action!,
+          ],
         ],
       ),
     );

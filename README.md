@@ -353,3 +353,5 @@ flutter run -d linux# Dalys
 flutter analyze
 # Dalys
 # Dalys
+pour ios flutter build ipa (pour une version de production) après avoir restauré les packages (flutter pub get) 
+pour android flutter build apk (pour une version de production) après avoir restauré les packages (flutter pub get)

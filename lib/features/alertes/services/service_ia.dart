@@ -1,5 +1,4 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:dalys/data/models/modele_alerte.dart';
 import '../../../data/models/medication_model.dart';
 
@@ -76,8 +75,23 @@ class ServiceIA {
     final alertes = <ModeleAlerte>[];
     final maintenant = DateTime.now();
 
-    // Analyser SpO2
     final spo2 = donneesPatient['spo2'] as double? ?? 95.0;
+    final freqResp =
+        donneesPatient['frequence_respiratoire'] as double? ?? 16.0;
+
+    // Calculer un score de risque global (0-100)
+    double riskScore = 0;
+    if (spo2 < 90)
+      riskScore += 60;
+    else if (spo2 < 94) riskScore += 30;
+
+    if (freqResp > 25)
+      riskScore += 20;
+    else if (freqResp > 20) riskScore += 10;
+
+    riskScore = riskScore.clamp(0, 100);
+
+    // Analyser SpO2
     if (spo2 < 90) {
       alertes.add(ModeleAlerte(
         id: 'ia_spo2_${maintenant.millisecondsSinceEpoch}',
@@ -89,6 +103,12 @@ class ServiceIA {
         dateCreation: maintenant,
         niveauPriorite: 100,
         niveauNotification: NiveauNotification.urgence,
+        metadonnees: {
+          'risk_score': riskScore,
+          'forecast_6h': riskScore > 50 ? 'Dégradation' : 'Stable',
+          'forecast_24h': 'Surveillance requise',
+          'forecast_7j': 'Risque modéré',
+        },
         donneesMedicales: {
           'spo2_actuel': spo2,
           'seuil_critique': 90,
@@ -114,6 +134,11 @@ class ServiceIA {
         niveauPriorite: 75,
         dateCreation: maintenant,
         niveauNotification: NiveauNotification.alerte,
+        metadonnees: {
+          'risk_score': riskScore,
+          'forecast_6h': 'Stable',
+          'forecast_24h': 'Amélioration possible',
+        },
         donneesMedicales: {
           'spo2_actuel': spo2,
           'seuil_optimal': 95,
@@ -155,8 +180,6 @@ class ServiceIA {
     }
 
     // Analyser la fréquence respiratoire
-    final freqResp =
-        donneesPatient['frequence_respiratoire'] as double? ?? 18.0;
     if (freqResp > 25) {
       alertes.add(ModeleAlerte(
         id: 'ia_freq_${maintenant.millisecondsSinceEpoch}',

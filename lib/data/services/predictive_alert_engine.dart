@@ -2,6 +2,9 @@ import '../models/health_data.dart';
 import '../models/patient_risk_profile.dart';
 import '../models/trend_models.dart';
 import '../models/fragility_models.dart';
+import '../models/fragility_forecast_models.dart';
+import '../models/long_term_analysis_models.dart';
+import '../models/multi_horizon_alerts_models.dart';
 import '../models/actionable_recommendation.dart';
 import '../models/modele_alerte.dart';
 import 'trend_analysis_service.dart';
@@ -76,6 +79,272 @@ class PredictiveAlertEngine {
     );
   }
 
+  /// NOUVEAU: Génère des alertes multi-temporelles (6h/24h/7j)
+  Future<MultiHorizonAlerts> generateMultiHorizonAlerts(
+    PatientRiskProfile profile,
+    List<HealthData> fullHistory,
+  ) async {
+    if (fullHistory.isEmpty) {
+      return MultiHorizonAlerts.empty();
+    }
+
+    // 1️⃣ Analyse long-terme avec TOUT l'historique
+    final longTermAnalysis =
+        await _trendService.analyzeLongTermTrends(fullHistory);
+
+    // 2️⃣ Prévisions de fragilité multi-horizon
+    final fragilityForecast =
+        await _fragilityService.calculateFragilityForecast(
+      fullHistory,
+      profile,
+    );
+
+    // 3️⃣ Alertes préventives par horizon temporel
+    final alerts6h = _generatePreventive6HourAlerts(fragilityForecast);
+    final alerts24h =
+        _generatePreventive24HourAlerts(fragilityForecast, longTermAnalysis);
+    final alerts7d =
+        _generatePreventive7DayAlerts(fragilityForecast, longTermAnalysis);
+
+    // 4️⃣ Recommandations stratégiques basées sur l'analyse complète
+    final strategicRecommendations = _generateStrategicRecommendations(
+      fragilityForecast,
+      longTermAnalysis,
+    );
+
+    return MultiHorizonAlerts(
+      alerts6Hours: alerts6h,
+      alerts24Hours: alerts24h,
+      alerts7Days: alerts7d,
+      fragilityForecast: fragilityForecast,
+      longTermAnalysis: longTermAnalysis,
+      strategicRecommendations: strategicRecommendations,
+      generatedAt: DateTime.now(),
+    );
+  }
+
+  /// Alertes préventives 6h (urgence imminente)
+  List<PreventiveAlert> _generatePreventive6HourAlerts(
+      FragilityForecast forecast) {
+    final alerts = <PreventiveAlert>[];
+
+    if (forecast.prediction6Hours.predictedLevel == FragilityLevel.critical) {
+      alerts.add(PreventiveAlert(
+        id: 'critical_6h_${DateTime.now().millisecondsSinceEpoch}',
+        severity: AlertSeverity.critical,
+        timeHorizon: '6 heures',
+        title: '🚨 URGENCE IMMINENTE',
+        message: 'Risque critique détecté dans les 6h prochaines',
+        confidence: forecast.prediction6Hours.confidence,
+        preventiveActions: [
+          'ARRÊTER toute activité physique',
+          'Mesurer SpO₂ toutes les heures',
+          'Préparer médicaments d\'urgence',
+          'Alerter contacts d\'urgence',
+          'Ne pas rester seul(e)',
+        ],
+        riskFactors: forecast.prediction6Hours.riskFactors,
+        estimatedOnset: DateTime.now().add(Duration(hours: 6)),
+        worstCaseScenario: forecast.prediction6Hours.worstCaseScenario,
+      ));
+    }
+
+    if (forecast.prediction6Hours.predictedLevel == FragilityLevel.elevated) {
+      alerts.add(PreventiveAlert(
+        id: 'elevated_6h_${DateTime.now().millisecondsSinceEpoch}',
+        severity: AlertSeverity.high,
+        timeHorizon: '6 heures',
+        title: '⚠️ Vigilance renforcée requise',
+        message: 'Dégradation probable dans les 6h',
+        confidence: forecast.prediction6Hours.confidence,
+        preventiveActions: [
+          'Limiter efforts physiques',
+          'Mesures toutes les 2h',
+          'Rester dans environnement sûr',
+          'Tenir médicaments à portée',
+        ],
+        riskFactors: forecast.prediction6Hours.riskFactors,
+        estimatedOnset: DateTime.now().add(Duration(hours: 6)),
+        worstCaseScenario: forecast.prediction6Hours.worstCaseScenario,
+      ));
+    }
+
+    return alerts;
+  }
+
+  /// Alertes préventives 24h (planification quotidienne)
+  List<PreventiveAlert> _generatePreventive24HourAlerts(
+    FragilityForecast forecast,
+    LongTermTrendAnalysis longTermAnalysis,
+  ) {
+    final alerts = <PreventiveAlert>[];
+
+    if (forecast.prediction24Hours.predictedLevel != FragilityLevel.stable) {
+      final actions = <String>[];
+
+      // Actions basées sur le niveau prédit
+      if (forecast.prediction24Hours.predictedLevel ==
+          FragilityLevel.critical) {
+        actions.addAll([
+          'Planifier journée repos complet',
+          'Annuler rendez-vous non essentiels',
+          'Mesures toutes les 4h demain',
+          'Contact médecin recommandé',
+        ]);
+      } else {
+        actions.addAll([
+          'Adapter planning demain',
+          'Privilégier activités légères',
+          'Surveillance renforcée',
+        ]);
+      }
+
+      // Actions spécifiques aux patterns détectés
+      if (!longTermAnalysis.hasInsufficientData) {
+        final tomorrow = DateTime.now().add(Duration(days: 1));
+        final tomorrowWeekday = tomorrow.weekday;
+
+        if (longTermAnalysis.weeklyPatterns.spo2ByDay
+            .containsKey(tomorrowWeekday)) {
+          final worstDay = longTermAnalysis.weeklyPatterns.worstDay;
+          if (tomorrowWeekday == worstDay) {
+            actions
+                .add('⚠️ Demain = votre jour le plus difficile habituellement');
+          }
+        }
+      }
+
+      alerts.add(PreventiveAlert(
+        id: 'planning_24h_${DateTime.now().millisecondsSinceEpoch}',
+        severity:
+            forecast.prediction24Hours.predictedLevel == FragilityLevel.critical
+                ? AlertSeverity.critical
+                : AlertSeverity.medium,
+        timeHorizon: '24 heures',
+        title: 'Planification préventive demain',
+        message: 'Adaptations recommandées pour demain',
+        confidence: forecast.prediction24Hours.confidence,
+        preventiveActions: actions,
+        riskFactors: forecast.prediction24Hours.riskFactors,
+        estimatedOnset: DateTime.now().add(Duration(hours: 24)),
+        worstCaseScenario: forecast.prediction24Hours.worstCaseScenario,
+      ));
+    }
+
+    return alerts;
+  }
+
+  /// Alertes préventives 7j (stratégie hebdomadaire)
+  List<PreventiveAlert> _generatePreventive7DayAlerts(
+    FragilityForecast forecast,
+    LongTermTrendAnalysis longTermAnalysis,
+  ) {
+    final alerts = <PreventiveAlert>[];
+
+    // Alertes basées sur les tendances long-terme
+    if (!longTermAnalysis.hasInsufficientData) {
+      final trends = longTermAnalysis.longTermTrends;
+
+      if (trends.spo2Trend < -1.0) {
+        // Déclin significatif
+        alerts.add(PreventiveAlert(
+          id: 'longterm_decline_${DateTime.now().millisecondsSinceEpoch}',
+          severity: AlertSeverity.high,
+          timeHorizon: '7 jours',
+          title: 'Déclin long-terme détecté',
+          message: 'Tendance négative sur votre historique étendu',
+          confidence: 0.8,
+          preventiveActions: [
+            'Consulter médecin cette semaine',
+            'Réévaluer traitement actuel',
+            'Optimiser environnement de vie',
+            'Renforcer suivi quotidien',
+          ],
+          riskFactors: [
+            'Déclin SpO₂ de ${trends.spo2Trend.toStringAsFixed(1)}%/semaine'
+          ],
+          estimatedOnset: DateTime.now().add(Duration(days: 7)),
+          worstCaseScenario: forecast.prediction7Days.worstCaseScenario,
+        ));
+      }
+
+      // Alertes basées sur les cycles récurrents
+      for (var cycle in longTermAnalysis.recurringCycles) {
+        if (cycle.similarity > 0.8 && cycle.pattern.contains('dégradation')) {
+          alerts.add(PreventiveAlert(
+            id: 'recurring_cycle_${cycle.lengthDays}d_${DateTime.now().millisecondsSinceEpoch}',
+            severity: AlertSeverity.medium,
+            timeHorizon: '${cycle.lengthDays} jours',
+            title: 'Cycle défavorable prévu',
+            message: 'Pattern récurrent de ${cycle.lengthDays} jours détecté',
+            confidence: cycle.similarity,
+            preventiveActions: [
+              'Préparer stratégie spécifique',
+              'Adapter routine les jours concernés',
+              'Surveillance préventive renforcée',
+            ],
+            riskFactors: [cycle.pattern],
+            estimatedOnset:
+                DateTime.now().add(Duration(days: cycle.lengthDays)),
+            worstCaseScenario:
+                'Risque de répétition du pattern de dégradation observé précédemment.',
+          ));
+        }
+      }
+    }
+
+    return alerts;
+  }
+
+  /// Recommandations stratégiques basées sur l'analyse complète
+  List<StrategicRecommendation> _generateStrategicRecommendations(
+    FragilityForecast forecast,
+    LongTermTrendAnalysis longTermAnalysis,
+  ) {
+    final recommendations = <StrategicRecommendation>[];
+
+    // Stratégie basée sur les patterns hebdomadaires
+    if (!longTermAnalysis.hasInsufficientData) {
+      final weeklyPattern = longTermAnalysis.weeklyPatterns;
+
+      recommendations.add(StrategicRecommendation(
+        category: 'Optimisation hebdomadaire',
+        title: 'Adapter votre routine aux patterns détectés',
+        description: 'Votre meilleur jour: ${weeklyPattern.bestDayName}, '
+            'votre jour le plus difficile: ${weeklyPattern.worstDayName}',
+        actions: [
+          'Planifier activités importantes les ${weeklyPattern.bestDayName}',
+          'Repos prioritaire les ${weeklyPattern.worstDayName}',
+          'Surveillance renforcée veilles de ${weeklyPattern.worstDayName}',
+        ],
+        evidence: 'Basé sur ${weeklyPattern.spo2ByDay.length} jours d\'analyse',
+        isBestLever: weeklyPattern.worstDay == DateTime.now().weekday,
+      ));
+
+      // Stratégie basée sur les corrélations
+      final correlations = longTermAnalysis.extendedCorrelations;
+      if (correlations.spo2BreathingCorr.abs() > 0.6) {
+        recommendations.add(StrategicRecommendation(
+          category: 'Exercices ciblés',
+          title: 'Forte corrélation SpO₂-Respiration détectée',
+          description:
+              'Vos paramètres sont ${correlations.spo2BreathingCorr > 0 ? "positivement" : "négativement"} liés',
+          actions: [
+            'Privilégier exercices respiratoires quotidiens',
+            'Surveillance simultanée des deux paramètres',
+            'Techniques de respiration lors de stress',
+          ],
+          evidence:
+              'Corrélation: ${correlations.spo2BreathingCorr.toStringAsFixed(2)}',
+          isBestLever:
+              true, // La stabilisation respiratoire est souvent le meilleur levier
+        ));
+      }
+    }
+
+    return recommendations;
+  }
+
   /// Convertit les TrendAlert en ModeleAlerte
   List<ModeleAlerte> _convertTrendAlertsToModeleAlerte(
       List<TrendAlert> trendAlerts) {
@@ -140,14 +409,14 @@ class PredictiveAlertEngine {
         priorite = 50;
     }
 
-    final factorsDescription = score.factors
-        .map((f) => '• ${f.name}: ${f.explanation}')
-        .join('\n');
+    final factorsDescription =
+        score.factors.map((f) => '• ${f.name}: ${f.explanation}').join('\n');
 
     return ModeleAlerte(
       id: 'fragility_${DateTime.now().millisecondsSinceEpoch}',
       titre: '${score.level.emoji} Score de fragilité: ${score.level.label}',
-      description: 'Votre score de fragilité est de ${score.value.toStringAsFixed(0)}/100.\n\n'
+      description:
+          'Votre score de fragilité est de ${score.value.toStringAsFixed(0)}/100.\n\n'
           'Facteurs contributifs:\n$factorsDescription',
       type: type,
       niveauPriorite: priorite,
@@ -216,8 +485,7 @@ class PredictiveAlertEngine {
           '✅ ACTIONS À PRENDRE (${result.actionableRecommendations.length})');
       buffer.writeln('───────────────────────────────────────');
       for (var rec in result.actionableRecommendations.take(5)) {
-        buffer.writeln(
-            '${rec.isCritical ? '🚨' : '📋'} ${rec.action}');
+        buffer.writeln('${rec.isCritical ? '🚨' : '📋'} ${rec.action}');
         buffer.writeln('  ⏱️ ${rec.timeRemainingLabel}');
         buffer.writeln('  ✓ ${rec.successCriteria}');
         buffer.writeln();

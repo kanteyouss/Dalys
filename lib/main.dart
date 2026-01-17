@@ -12,17 +12,19 @@ import 'core/theme/app_theme.dart';
 import 'features/health_monitoring/controllers/health_controller.dart';
 import 'features/alertes/controllers/controleur_alertes.dart';
 import 'features/alertes/widgets/emergency_countdown_overlay.dart';
-import 'data/services/auth_service.dart'; 
+import 'data/services/auth_service.dart';
 import 'data/services/service_reconnaissance_vocale.dart';
 import 'data/services/service_vocal.dart';
 import 'data/models/modele_alerte.dart';
 import 'data/services/medication_service.dart';
+import 'data/services/notification_settings_service.dart';
+import 'features/alertes/services/service_notifications.dart';
 
 // Note: If AppLocalizations is not generated yet, this might cause a lint error.
 // We keep it as it was in the original file.
 // import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
-void main() {
+void main() async {
   // Initialiser les services nécessaires
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -37,23 +39,50 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   }
 
-  runApp(const MyApp());
+  // Vérifier la session persistante
+  final authService = AuthService();
+  final bool isLoggedIn = await authService.tryAutoLogin();
+  final String initialRoute = isLoggedIn ? '/tableau-bord' : '/login';
+
+  // Initialiser les filtres de notification pour les singletons
+  final settingsService = NotificationSettingsService();
+
+  ServiceNotifications().setSettingsService(settingsService);
+  ServiceVocal().setSettingsService(settingsService);
+
+  runApp(MyApp(initialRoute: initialRoute, settingsService: settingsService));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final String initialRoute;
+  final NotificationSettingsService settingsService;
+  const MyApp(
+      {super.key, required this.initialRoute, required this.settingsService});
+
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         Provider(create: (_) => AuthService()),
+        ChangeNotifierProvider.value(value: settingsService),
         ChangeNotifierProvider(create: (_) => MedicationService()),
-        ChangeNotifierProxyProvider<MedicationService, ControleurAlertes>(
+        ChangeNotifierProxyProvider<NotificationSettingsService,
+            ControleurAlertes>(
           create: (_) => ControleurAlertes()..initialiser(),
-          update: (_, medicationService, alertController) {
+          update: (_, settingsService, alertController) {
             alertController ??= ControleurAlertes()..initialiser();
-            alertController.setMedicationService(medicationService);
+            alertController.setSettingsService(settingsService);
+            return alertController;
+          },
+        ),
+        ChangeNotifierProxyProvider<MedicationService, ControleurAlertes>(
+          create: (context) =>
+              Provider.of<ControleurAlertes>(context, listen: false),
+          update: (_, medicationService, alertController) {
+            alertController!.setMedicationService(medicationService);
             return alertController;
           },
         ),
@@ -71,10 +100,10 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
-        initialRoute: '/login',
+        initialRoute: initialRoute,
         onGenerateRoute: AppRoutes.onGenerateRoute,
         debugShowCheckedModeBanner: false,
-        navigatorKey: GlobalKey<NavigatorState>(),
+        navigatorKey: navigatorKey,
         builder: (context, child) {
           return MainWrapper(child: child!);
         },
@@ -110,19 +139,20 @@ class _MainWrapperState extends State<MainWrapper> {
   @override
   void initState() {
     super.initState();
-    
+
     // Attendre que le widget soit monté avant d'écouter les urgences
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _setupEmergencyListeners();
     });
   }
-  
+
   void _setupEmergencyListeners() {
     final alertController = context.read<ControleurAlertes>();
     _emergencySubscription = alertController.emergencyStream.listen((event) {
       final user = AuthService().currentUser;
-      if (user != null && mounted) {
-        EmergencyCountdownOverlay.show(context, user, event.title);
+      final navContext = MyApp.navigatorKey.currentContext;
+      if (user != null && navContext != null && mounted) {
+        EmergencyCountdownOverlay.show(navContext, user, event.title);
       }
     });
 
@@ -131,7 +161,8 @@ class _MainWrapperState extends State<MainWrapper> {
     _voiceSubscription = _voiceService.wordsStream.listen((word) {
       if (_voiceService.isEmergency(word)) {
         final user = AuthService().currentUser;
-        if (user != null && mounted) {
+        final navContext = MyApp.navigatorKey.currentContext;
+        if (user != null && navContext != null && mounted) {
           final declaredState = _voiceService.getDeclaredState(word);
           debugPrint('🎤 DÉCLENCHEMENT VOCAL D\'URGENCE : $declaredState');
 
@@ -140,7 +171,7 @@ class _MainWrapperState extends State<MainWrapper> {
               "Alerte détectée. Lancement du protocole d'urgence.",
               niveau: NiveauNotification.urgence);
 
-          EmergencyCountdownOverlay.show(context, user, declaredState);
+          EmergencyCountdownOverlay.show(navContext, user, declaredState);
         }
       }
     });

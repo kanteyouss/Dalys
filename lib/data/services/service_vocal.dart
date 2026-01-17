@@ -15,6 +15,18 @@ class ServiceVocal {
   bool _isSttInitialized = false;
   bool _isTtsInitialized = false;
 
+  /// Service des paramètres de notification
+  dynamic _settingsService;
+
+  void setSettingsService(dynamic service) {
+    _settingsService = service;
+  }
+
+  bool _estAutorise(String categorie) {
+    if (_settingsService == null) return true;
+    return _settingsService.isNotificationEnabled(categorie);
+  }
+
   // Callbacks
   Function(String)? onStatus;
   Function(String)? onError;
@@ -101,6 +113,10 @@ class ServiceVocal {
 
   /// Parle (Synthèse vocale) avec adaptation situationnelle
   Future<void> parler(String texte, {NiveauNotification? niveau}) async {
+    if (!_estAutorise('voice')) {
+      debugPrint("🚫 Synthèse vocale désactivée par l'utilisateur.");
+      return;
+    }
     if (!_isTtsInitialized) await _initTts();
 
     if (defaultTargetPlatform == TargetPlatform.linux) {

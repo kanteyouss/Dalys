@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:io' show Platform;
 import 'package:dalys/data/models/modele_alerte.dart';
 
 /// Service pour la gestion des alertes environnementales
@@ -45,6 +46,22 @@ class ServiceEnvironnemental {
   Future<Position?> _obtenirPosition() async {
     if (_positionActuelle != null) return _positionActuelle;
 
+    if (Platform.isLinux) {
+      _positionActuelle = Position(
+        latitude: 5.36,
+        longitude: -4.008,
+        timestamp: DateTime.now(),
+        accuracy: 10.0,
+        altitude: 10.0,
+        heading: 0.0,
+        speed: 0.0,
+        speedAccuracy: 0.0,
+        altitudeAccuracy: 0.0,
+        headingAccuracy: 0.0,
+      );
+      return _positionActuelle;
+    }
+
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -67,7 +84,9 @@ class ServiceEnvironnemental {
       }
 
       _positionActuelle = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+        ),
       );
 
       debugPrint(

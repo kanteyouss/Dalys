@@ -7,10 +7,10 @@ class PredictiveHealthCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const PredictiveHealthCard({
-    Key? key,
+    super.key,
     required this.score,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -47,30 +47,18 @@ class PredictiveHealthCard extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  // Score circulaire
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      SizedBox(
-                        width: 60,
-                        height: 60,
-                        child: CircularProgressIndicator(
-                          value: score!.value / 100,
-                          strokeWidth: 6,
-                          backgroundColor: Colors.grey.shade200,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            _getScoreColor(),
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '${score!.value.toInt()}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  // Icône d'état
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _getScoreColor().withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _getStateIcon(),
+                      color: _getScoreColor(),
+                      size: 32,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -167,6 +155,16 @@ class PredictiveHealthCard extends StatelessWidget {
       return 'Surveillance renforcée nécessaire';
     } else {
       return 'Consultez rapidement votre médecin';
+    }
+  }
+
+  IconData _getStateIcon() {
+    if (score!.value < 50) {
+      return Icons.check_circle_outline;
+    } else if (score!.value < 85) {
+      return Icons.visibility_outlined;
+    } else {
+      return Icons.warning_amber_rounded;
     }
   }
 }

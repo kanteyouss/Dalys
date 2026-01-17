@@ -353,6 +353,27 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     ]),
                     const SizedBox(height: 32),
+                    _buildSectionTitle('Préférences'),
+                    _buildCard([
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.notifications_active_outlined,
+                              color: Colors.blue),
+                        ),
+                        title: const Text('Notifications'),
+                        subtitle: const Text('Gérer vos alertes et rappels'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.pushNamed(
+                            context, '/notification-settings'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ]),
+                    const SizedBox(height: 32),
                     const SizedBox(height: 24),
                     const SizedBox(height: 24),
                     AnimatedSwitcher(
@@ -416,10 +437,12 @@ class _ProfilePageState extends State<ProfilePage> {
                               children: [
                                 const SizedBox(height: 20),
                                 OutlinedButton.icon(
-                                  onPressed: () {
-                                    _authService.logout();
-                                    Navigator.pushReplacementNamed(
-                                        context, '/login');
+                                  onPressed: () async {
+                                    await _authService.logout();
+                                    if (mounted) {
+                                      Navigator.pushReplacementNamed(
+                                          context, '/login');
+                                    }
                                   },
                                   style: OutlinedButton.styleFrom(
                                     minimumSize: const Size.fromHeight(56),

@@ -14,6 +14,7 @@ import '../features/respiration/screens/ecran_respiration.dart';
 import '../features/prevention/screens/fragility_score_screen.dart';
 import '../data/models/modele_alerte.dart';
 import '../features/health_monitoring/screens/medication_page.dart';
+import '../features/onboarding_auth/screens/notification_settings_page.dart';
 import '../data/services/auth_service.dart';
 
 class AppRoutes {
@@ -33,6 +34,7 @@ class AppRoutes {
   static const String emailTest = '/email-test';
   static const String scoreSante = '/score-sante';
   static const String fragilityScore = '/fragility-score';
+  static const String notificationSettings = '/notification-settings';
 
   // Routes héritées (compatibilité)
   static const String dashboard = '/dashboard';
@@ -56,6 +58,7 @@ class AppRoutes {
       historique: (context) => const HealthHistoryPage(),
       respiration: (context) => const EcranRespiration(),
       medications: (context) => const MedicationPage(),
+      notificationSettings: (context) => const NotificationSettingsPage(),
 
       // Routes héritées (compatibilité)
       dashboard: (context) => const MainScaffold(),
@@ -121,6 +124,10 @@ class AppRoutes {
 
       case medications:
         return MaterialPageRoute(builder: (context) => const MedicationPage());
+
+      case notificationSettings:
+        return MaterialPageRoute(
+            builder: (context) => const NotificationSettingsPage());
 
       case emailTest:
         return MaterialPageRoute(builder: (context) => const EmailTestPage());

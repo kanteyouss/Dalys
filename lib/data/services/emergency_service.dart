@@ -123,23 +123,39 @@ class EmergencyService {
   }
 
   Future<Position?> _getCurrentLocation() async {
+    if (Platform.isLinux) {
+      return Position(
+        latitude: 5.36,
+        longitude: -4.008,
+        timestamp: DateTime.now(),
+        accuracy: 10.0,
+        altitude: 10.0,
+        heading: 0.0,
+        speed: 0.0,
+        speedAccuracy: 0.0,
+        altitudeAccuracy: 0.0,
+        headingAccuracy: 0.0,
+      );
+    }
+
     try {
       bool serviceEnabled = false;
       try {
         serviceEnabled = await Geolocator.isLocationServiceEnabled();
       } catch (e) {
-        if (!Platform.isLinux) {
-          debugPrint(
-              '⚠️ Geolocator.isLocationServiceEnabled non supporté : $e');
-        }
+        debugPrint('⚠️ Erreur vérification service localisation: $e');
+        // Sur certaines plateformes, on continue quand même pour essayer d'obtenir la position
+        serviceEnabled = true;
       }
 
       if (!serviceEnabled) {
-        debugPrint('Location services are disabled or not supported.');
+        debugPrint(
+            'ℹ️ Services de localisation désactivés, tentative de récupération de la dernière position connue...');
         try {
           return await Geolocator.getLastKnownPosition();
         } catch (e) {
-          debugPrint('⚠️ Geolocator.getLastKnownPosition non supporté : $e');
+          debugPrint(
+              '⚠️ Impossible de récupérer la dernière position connue: $e');
           return null;
         }
       }
@@ -201,7 +217,12 @@ class EmergencyService {
         debugPrint('⚠️ Erreur flux localisation : $e');
       });
     } catch (e) {
-      debugPrint('⚠️ Impossible de démarrer le suivi de localisation : $e');
+      if (e.toString().contains('MissingPluginException')) {
+        debugPrint(
+            'ℹ️ Suivi de localisation non supporté sur cette plateforme (Linux)');
+      } else {
+        debugPrint('⚠️ Impossible de démarrer le suivi de localisation : $e');
+      }
     }
   }
 

@@ -2,27 +2,26 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:timezone/timezone.dart' as tz;
-
+import 'dart:io' show Platform;
 
 /// Service de géolocalisation pour déterminer le fuseau horaire approprié
 /// Adapté spécifiquement pour la Côte d'Ivoire avec fallback intelligent
 class ServiceGeolocalisation {
   /// Instance singleton du service
-  static final ServiceGeolocalisation _instance = ServiceGeolocalisation._internal();
+  static final ServiceGeolocalisation _instance =
+      ServiceGeolocalisation._internal();
   factory ServiceGeolocalisation() => _instance;
   ServiceGeolocalisation._internal();
 
-
-  
   /// Position actuelle mise en cache
   Position? _positionActuelle;
-  
+
   /// Fuseau horaire détecté mis en cache
   tz.Location? _fuseauHoraireCache;
-  
+
   /// Dernière mise à jour de la position
   DateTime? _derniereMiseAJour;
-  
+
   /// Durée de validité du cache (2 heures)
   static const Duration _dureeValiditeCache = Duration(hours: 2);
 
@@ -32,20 +31,20 @@ class ServiceGeolocalisation {
     try {
       // Initialiser la base de données des fuseaux horaires
       await _initialiserFuseauxHoraires();
-      
+
       // Vérifier les permissions
       final permissionsAccordees = await _verifierPermissionsLocalisation();
       if (!permissionsAccordees) {
-        debugPrint('⚠️ Permissions de géolocalisation non accordées - utilisation du fuseau par défaut');
+        debugPrint(
+            '⚠️ Permissions de géolocalisation non accordées - utilisation du fuseau par défaut');
         return false;
       }
-      
+
       // Tenter d'obtenir la position actuelle
       await _obtenirPositionActuelle();
-      
+
       debugPrint('✅ Service de géolocalisation initialisé');
       return true;
-      
     } catch (erreur) {
       debugPrint('❌ Erreur initialisation géolocalisation: $erreur');
       return false;
@@ -56,10 +55,11 @@ class ServiceGeolocalisation {
   /// Priorité: Position GPS > Paramètres système > Défaut Côte d'Ivoire
   Future<tz.Location> obtenirFuseauHoraireOptimal() async {
     // Vérifier si le cache est encore valide
-    if (_fuseauHoraireCache != null && 
+    if (_fuseauHoraireCache != null &&
         _derniereMiseAJour != null &&
         DateTime.now().difference(_derniereMiseAJour!) < _dureeValiditeCache) {
-      debugPrint('📍 Fuseau horaire depuis le cache: ${_fuseauHoraireCache!.name}');
+      debugPrint(
+          '📍 Fuseau horaire depuis le cache: ${_fuseauHoraireCache!.name}');
       return _fuseauHoraireCache!;
     }
 
@@ -76,7 +76,8 @@ class ServiceGeolocalisation {
       final fuseauSysteme = await _obtenirFuseauParSysteme();
       if (fuseauSysteme != null) {
         _mettreEnCache(fuseauSysteme);
-        debugPrint('📱 Fuseau horaire détecté par système: ${fuseauSysteme.name}');
+        debugPrint(
+            '📱 Fuseau horaire détecté par système: ${fuseauSysteme.name}');
         return fuseauSysteme;
       }
 
@@ -85,14 +86,14 @@ class ServiceGeolocalisation {
       _mettreEnCache(fuseauRegion);
       debugPrint('🌍 Fuseau horaire par région: ${fuseauRegion.name}');
       return fuseauRegion;
-
     } catch (erreur) {
       debugPrint('❌ Erreur détection fuseau horaire: $erreur');
-      
+
       // Fallback: Côte d'Ivoire par défaut
       final fuseauDefaut = _obtenirFuseauParDefaut();
       _mettreEnCache(fuseauDefaut);
-      debugPrint('🇨🇮 Fuseau horaire par défaut (Abidjan): ${fuseauDefaut.name}');
+      debugPrint(
+          '🇨🇮 Fuseau horaire par défaut (Abidjan): ${fuseauDefaut.name}');
       return fuseauDefaut;
     }
   }
@@ -101,13 +102,16 @@ class ServiceGeolocalisation {
   /// Affiche un dialog explicatif pour améliorer l'UX
   Future<bool> demanderPermissionAvecDialog(BuildContext context) async {
     // Vérifier d'abord si les permissions sont déjà accordées
+    if (Platform.isLinux) return true;
+
     final statutActuel = await Geolocator.checkPermission();
-    if (statutActuel == LocationPermission.always || 
+    if (statutActuel == LocationPermission.always ||
         statutActuel == LocationPermission.whileInUse) {
       return true;
     }
 
     // Afficher le dialog explicatif
+    if (!context.mounted) return false;
     final accord = await _afficherDialogPermission(context);
     if (!accord) return false;
 
@@ -195,7 +199,7 @@ class ServiceGeolocalisation {
     try {
       // Obtenir le fuseau horaire du système
       final fuseauSysteme = DateTime.now().timeZoneName;
-      
+
       // Tenter de mapper vers un fuseau tz valide
       if (fuseauSysteme.contains('GMT') || fuseauSysteme.contains('UTC')) {
         // Si c'est GMT/UTC, utiliser Abidjan (même fuseau que GMT)
@@ -209,7 +213,6 @@ class ServiceGeolocalisation {
         // Si le fuseau système n'est pas reconnu, essayer des variantes
         return _essayerVariantesFuseaux(fuseauSysteme);
       }
-
     } catch (erreur) {
       debugPrint('⚠️ Impossible d\'obtenir le fuseau système: $erreur');
       return null;
@@ -229,8 +232,10 @@ class ServiceGeolocalisation {
 
   /// Vérifie et demande les permissions de géolocalisation
   Future<bool> _verifierPermissionsLocalisation() async {
+    if (Platform.isLinux) return true;
+
     final statutActuel = await Geolocator.checkPermission();
-    
+
     switch (statutActuel) {
       case LocationPermission.always:
       case LocationPermission.whileInUse:
@@ -248,30 +253,56 @@ class ServiceGeolocalisation {
 
   /// Demande les permissions de géolocalisation
   Future<bool> _demanderPermissionsLocalisation() async {
+    if (Platform.isLinux) return true;
     final permission = await Geolocator.requestPermission();
-    return permission == LocationPermission.always || 
-           permission == LocationPermission.whileInUse;
+    return permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse;
   }
 
   /// Obtient la position GPS actuelle
   Future<void> _obtenirPositionActuelle() async {
+    if (Platform.isLinux) {
+      _positionActuelle = Position(
+        latitude: 5.36,
+        longitude: -4.008,
+        timestamp: DateTime.now(),
+        accuracy: 10.0,
+        altitude: 10.0,
+        heading: 0.0,
+        speed: 0.0,
+        speedAccuracy: 0.0,
+        altitudeAccuracy: 0.0,
+        headingAccuracy: 0.0,
+      );
+      _derniereMiseAJour = DateTime.now();
+      debugPrint('📍 Position simulée (Linux/Abidjan) obtenue');
+      return;
+    }
+
     try {
-      final serviceActive = await Geolocator.isLocationServiceEnabled();
+      bool serviceActive = false;
+      try {
+        serviceActive = await Geolocator.isLocationServiceEnabled();
+      } catch (e) {
+        debugPrint('⚠️ Erreur vérification service localisation: $e');
+        serviceActive = true; // On tente quand même
+      }
+
       if (!serviceActive) {
-        debugPrint('❌ Service de géolocalisation désactivé');
+        debugPrint(
+            'ℹ️ Service de géolocalisation désactivé, utilisation du fuseau par défaut');
         return;
       }
 
       _positionActuelle = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 10),
         ),
       );
 
       _derniereMiseAJour = DateTime.now();
-      debugPrint('📍 Position obtenue: ${_positionActuelle!.latitude}, ${_positionActuelle!.longitude}');
-
+      debugPrint(
+          '📍 Position obtenue: ${_positionActuelle!.latitude}, ${_positionActuelle!.longitude}');
     } catch (erreur) {
       debugPrint('❌ Erreur obtention position: $erreur');
       _positionActuelle = null;
@@ -283,15 +314,19 @@ class ServiceGeolocalisation {
     // Limites approximatives de la Côte d'Ivoire
     // Latitude: 4.2° N à 10.8° N
     // Longitude: 8.6° W à 2.5° W
-    return latitude >= 4.2 && latitude <= 10.8 &&
-           longitude >= -8.6 && longitude <= -2.5;
+    return latitude >= 4.2 &&
+        latitude <= 10.8 &&
+        longitude >= -8.6 &&
+        longitude <= -2.5;
   }
 
   /// Vérifie si les coordonnées sont en Afrique de l'Ouest
   bool _estEnAfriqueOuest(double latitude, double longitude) {
     // Zone élargie d'Afrique de l'Ouest
-    return latitude >= -5.0 && latitude <= 25.0 &&
-           longitude >= -20.0 && longitude <= 15.0;
+    return latitude >= -5.0 &&
+        latitude <= 25.0 &&
+        longitude >= -20.0 &&
+        longitude <= 15.0;
   }
 
   /// Détermine le fuseau horaire pour l'Afrique de l'Ouest
@@ -310,11 +345,12 @@ class ServiceGeolocalisation {
   }
 
   /// Détermine le fuseau horaire global par coordonnées (approximatif)
-  tz.Location _determinerFuseauParCoordonnees(double latitude, double longitude) {
+  tz.Location _determinerFuseauParCoordonnees(
+      double latitude, double longitude) {
     // Calcul approximatif basé sur la longitude
     // Chaque 15° de longitude ≈ 1 heure de décalage
     final decalageHeures = (longitude / 15.0).round();
-    
+
     try {
       // Essayer de trouver un fuseau correspondant
       if (decalageHeures == 0) {
@@ -360,56 +396,57 @@ class ServiceGeolocalisation {
   /// Affiche un dialog pour expliquer pourquoi la géolocalisation est nécessaire
   Future<bool> _afficherDialogPermission(BuildContext context) async {
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.location_on, color: Colors.blue),
-            SizedBox(width: 8),
-            Text('Géolocalisation'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Pour améliorer votre expérience avec les notifications médicales, '
-              'nous aimerions détecter votre fuseau horaire automatiquement.',
-              style: TextStyle(fontSize: 16),
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.location_on, color: Colors.blue),
+                SizedBox(width: 8),
+                Text('Géolocalisation'),
+              ],
             ),
-            SizedBox(height: 12),
-            Text(
-              '🌍 Cela nous permet de :',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pour améliorer votre expérience avec les notifications médicales, '
+                  'nous aimerions détecter votre fuseau horaire automatiquement.',
+                  style: TextStyle(fontSize: 16),
+                ),
+                SizedBox(height: 12),
+                Text(
+                  '🌍 Cela nous permet de :',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 8),
+                Text('• Programmer les rappels à la bonne heure'),
+                Text('• Adapter les alertes à votre localisation'),
+                Text('• Optimiser les notifications médicales'),
+                SizedBox(height: 12),
+                Text(
+                  '🔒 Vos données de localisation restent privées et ne sont pas partagées.',
+                  style: TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
             ),
-            SizedBox(height: 8),
-            Text('• Programmer les rappels à la bonne heure'),
-            Text('• Adapter les alertes à votre localisation'),
-            Text('• Optimiser les notifications médicales'),
-            SizedBox(height: 12),
-            Text(
-              '🔒 Vos données de localisation restent privées et ne sont pas partagées.',
-              style: TextStyle(
-                fontStyle: FontStyle.italic,
-                color: Colors.grey,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Refuser'),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Refuser'),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Autoriser'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Autoriser'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   /// Nettoie les ressources
@@ -425,23 +462,23 @@ extension ServiceGeolocalisationUtilitaires on ServiceGeolocalisation {
   /// Obtient une description textuelle de la localisation actuelle
   Future<String> obtenirDescriptionLocalisation() async {
     final infos = await obtenirInformationsLocalisation();
-    
+
     if (infos['position_disponible'] == true) {
       final coords = infos['coordonnees'];
       return 'Position: ${coords['latitude'].toStringAsFixed(2)}°, '
-             '${coords['longitude'].toStringAsFixed(2)}° '
-             '(±${infos['precision_gps']?.toStringAsFixed(0)}m)';
+          '${coords['longitude'].toStringAsFixed(2)}° '
+          '(±${infos['precision_gps']?.toStringAsFixed(0)}m)';
     } else {
       return 'Position non disponible - utilisation du fuseau par défaut';
     }
   }
-  
+
   /// Vérifie si l'utilisateur est probablement en Côte d'Ivoire
   Future<bool> estProbablementEnCoteIvoire() async {
     if (_positionActuelle == null) return true; // Présumé par défaut
-    
+
     return _estEnCoteIvoire(
-      _positionActuelle!.latitude, 
+      _positionActuelle!.latitude,
       _positionActuelle!.longitude,
     );
   }

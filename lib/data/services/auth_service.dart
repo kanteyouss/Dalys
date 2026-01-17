@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import 'database_service.dart';
 
@@ -10,6 +11,7 @@ class AuthService {
 
   final DatabaseService _dbService = DatabaseService();
   UserModel? _currentUser;
+  static const String _userKey = 'logged_user_id';
 
   UserModel? get currentUser => _currentUser;
 
@@ -40,7 +42,9 @@ class AuthService {
       final hashedUser = user.copyWith(password: _hashPassword(user.password));
 
       await db.insert('users', hashedUser.toMap());
-      return true;
+
+      // Auto-login après inscription
+      return await login(user.email, user.password);
     } catch (e) {
       print('Erreur lors de l\'inscription: $e');
       return false;
@@ -61,6 +65,11 @@ class AuthService {
 
       if (results.isNotEmpty) {
         _currentUser = UserModel.fromMap(results.first);
+
+        // Sauvegarder la session
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(_userKey, _currentUser!.id!);
+
         return true;
       }
       return false;
@@ -99,8 +108,37 @@ class AuthService {
     }
   }
 
+  // Restaurer la session au démarrage
+  Future<bool> tryAutoLogin() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!prefs.containsKey(_userKey)) return false;
+
+      final userId = prefs.getInt(_userKey);
+      if (userId == null) return false;
+
+      final db = await _dbService.database;
+      final List<Map<String, dynamic>> results = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [userId],
+      );
+
+      if (results.isNotEmpty) {
+        _currentUser = UserModel.fromMap(results.first);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Erreur lors de l\'auto-login: $e');
+      return false;
+    }
+  }
+
   // Déconnexion
-  void logout() {
+  Future<void> logout() async {
     _currentUser = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_userKey);
   }
 }

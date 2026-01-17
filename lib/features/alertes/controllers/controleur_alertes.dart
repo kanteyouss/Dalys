@@ -23,6 +23,16 @@ class ControleurAlertes extends ChangeNotifier {
   String? _messageErreur;
   bool _estEnModeSimulation = true;
   MedicationService? _medicationService;
+  dynamic _settingsService;
+
+  void setSettingsService(dynamic service) {
+    _settingsService = service;
+  }
+
+  bool _estAutorise(String categorie) {
+    if (_settingsService == null) return true;
+    return _settingsService.isNotificationEnabled(categorie);
+  }
 
   // Filtres et recherche
   Set<TypeAlerte> _filtresType = {};
@@ -119,6 +129,19 @@ class ControleurAlertes extends ChangeNotifier {
   Future<void> actualiser() => initialiser();
 
   void ajouterAlerte(ModeleAlerte alerte) {
+    // Vérifier les filtres utilisateur
+    String categorie = 'alert';
+    if (alerte.type == TypeAlerte.medicament) categorie = 'medication';
+    if (alerte.type == TypeAlerte.rendezvous) categorie = 'medication';
+    if (alerte.niveauNotification == NiveauNotification.prevention) {
+      categorie = 'forecast';
+    }
+
+    if (!_estAutorise(categorie)) {
+      debugPrint('🚫 Alerte filtrée par l\'utilisateur: ${alerte.titre}');
+      return;
+    }
+
     _listeAlertes.add(alerte);
     if (alerte.estUrgente) {
       _gererAlerteCritique(alerte);
@@ -140,37 +163,41 @@ class ControleurAlertes extends ChangeNotifier {
     debugPrint(
         '🔍 ControleurAlertes: analyserDonneesSante() appelé avec SpO2=${healthData.spo2}');
 
-    // Vérifier les niveaux critiques
-    if (healthData.spo2 < 92) {
-      debugPrint('⚠️ ControleurAlertes: Niveau critique détecté (SpO2 < 92)');
-      _creerAlerteSiNecessaire(
-        idPrefix: 'auto_spo2',
-        titre: 'Niveau d\'oxygène critique',
-        description:
-            'Votre saturation en oxygène est basse (${healthData.spo2}%).',
-        type: TypeAlerte.critique,
-        priorite: 90,
-        tags: ['santé', 'urgence', 'spo2'],
-      );
+    // 1. Analyse IA des prédictions de risque
+    final predictions = await ServiceIA().obtenirPredictionsRisque(
+      donneesPatient: {
+        'spo2': healthData.spo2.toDouble(),
+        'frequence_respiratoire': healthData.breathingRate.toDouble(),
+      },
+    );
 
-      // ENVOI AUTOMATIQUE pour les cas TRÈS critiques (SpO2 < 90)
-      if (healthData.spo2 < 90) {
-        debugPrint(
-            '🚨 ControleurAlertes: TRÈS CRITIQUE (SpO2 < 90) - Déclenchement automatique!');
-        await _triggerAutomaticEmergency(
-          'Saturation en oxygène très basse : ${healthData.spo2}%',
-          healthData,
-        );
-      } else {
-        debugPrint(
-            'ℹ️ ControleurAlertes: Critique mais pas < 90%, pas d\'envoi automatique');
+    for (var alerte in predictions) {
+      ajouterAlerte(
+          alerte.copierAvec(idUtilisateur: _currentUserId.toString()));
+
+      // Si le score de risque est critique (> 60) ou si c'est une alerte critique
+      final riskScore = alerte.metadonnees['risk_score'] as double? ?? 0;
+      if (riskScore > 60 || alerte.type == TypeAlerte.critique) {
+        String recommendation =
+            'Score de risque élevé (${riskScore.toInt()}/100). ';
+        recommendation += alerte.description;
+
+        if (_medicationService != null) {
+          // Identifier les traitements critiques (ex: Ventoline pour le souffle)
+          _medicationService!.highlightMedication('Ventoline', recommendation);
+        }
+
+        // Déclenchement automatique si TRÈS critique
+        if (riskScore > 80 || healthData.spo2 < 90) {
+          await _triggerAutomaticEmergency(
+            'Risque IA Critique (${riskScore.toInt()}%) : ${alerte.titre}',
+            healthData,
+          );
+        }
       }
-    } else {
-      debugPrint(
-          '✅ ControleurAlertes: Niveau normal (SpO2 >= 92), pas d\'alerte');
     }
 
-    // Analyse IA avancée (Observance + Santé)
+    // 2. Analyse IA de corrélation (Observance + Santé)
     if (_medicationService != null) {
       final iaAlertes = await ServiceIA().analyserObservanceEtSante(
         _medicationService!.medications,
@@ -181,10 +208,17 @@ class ControleurAlertes extends ChangeNotifier {
       );
 
       for (var alerte in iaAlertes) {
-        // Ajouter l'alerte si elle n'existe pas déjà (basé sur l'ID ou le type/date récente)
-        // Pour simplifier, on ajoute directement
         ajouterAlerte(
             alerte.copierAvec(idUtilisateur: _currentUserId.toString()));
+
+        if (alerte.titre.contains('Oubli')) {
+          for (var med in _medicationService!.medications) {
+            if (!med.isTakenToday) {
+              _medicationService!
+                  .highlightMedication(med.name, alerte.description);
+            }
+          }
+        }
       }
     }
   }

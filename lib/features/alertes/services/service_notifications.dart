@@ -27,6 +27,18 @@ class ServiceNotifications {
   /// État d'initialisation du service
   bool _estInitialise = false;
 
+  /// Service des paramètres de notification
+  dynamic _settingsService;
+
+  void setSettingsService(dynamic service) {
+    _settingsService = service;
+  }
+
+  bool _estAutorise(String categorie) {
+    if (_settingsService == null) return true;
+    return _settingsService.isNotificationEnabled(categorie);
+  }
+
   /// Compteur pour les IDs de notifications
   int _prochainIdNotification = 1000;
 
@@ -219,13 +231,26 @@ class ServiceNotifications {
       return;
     }
 
+    // Vérifier les filtres utilisateur
+    String categorie = 'alert';
+    if (alerte.type == TypeAlerte.medicament) categorie = 'medication';
+    if (alerte.type == TypeAlerte.rendezvous) categorie = 'medication';
+    if (alerte.niveauNotification == NiveauNotification.prevention) {
+      categorie = 'forecast';
+    }
+
+    if (!_estAutorise(categorie)) {
+      debugPrint('🚫 Notification filtrée par l\'utilisateur: ${alerte.titre}');
+      return;
+    }
+
     try {
       final idNotification = _obtenirIdNotification();
 
       // Pour les alertes non critiques, afficher sous forme de "message" (messaging style)
       if (alerte.type != TypeAlerte.critique && Platform.isAndroid) {
         // Utiliser MessagingStyleInformation pour un rendu conversationnel
-        final personneApp = Person(
+        const personneApp = Person(
           name: 'E-Santé 4.0',
           key: 'dalys_app',
           bot: true,
@@ -299,6 +324,12 @@ class ServiceNotifications {
   /// Affiche une notification critique avec priorité maximale
   Future<void> afficherNotificationCritique(ModeleAlerte alerte) async {
     if (!_estInitialise) return;
+
+    if (!_estAutorise('vital')) {
+      debugPrint(
+          '🚫 Alerte critique filtrée par l\'utilisateur: ${alerte.titre}');
+      return;
+    }
 
     try {
       final idNotification = _obtenirIdNotification();
@@ -376,7 +407,9 @@ class ServiceNotifications {
     if (!_estInitialise) return;
 
     try {
-      final idNotification = _obtenirIdNotification();
+      // Utiliser le hashCode de l'ID de l'alerte pour avoir un ID déterministe
+      // Cela permet d'annuler ou de mettre à jour une notification spécifique
+      final idNotification = alerte.id.hashCode;
 
       // Obtenir le fuseau horaire local approprié
       final fuseauLocal = await _obtenirFuseauHoraireLocal();
@@ -393,6 +426,24 @@ class ServiceNotifications {
       // Configuration de la notification
       final detailsAndroid = _configurerDetailsAndroid(alerte);
       final detailsiOS = _configurerDetailsIOS(alerte);
+
+      // Fallback pour Linux (zonedSchedule non supporté)
+      if (Platform.isLinux) {
+        debugPrint(
+            'ℹ️ zonedSchedule non supporté sur Linux. Affichage immédiat (fallback).');
+        await _pluginNotifications.show(
+          idNotification,
+          '${_formaterTitreNotification(alerte)} (Programmé pour ${dateLocaleProgrammee.hour}:${dateLocaleProgrammee.minute})',
+          _formaterMessageNotification(alerte),
+          NotificationDetails(
+            android: detailsAndroid,
+            iOS: detailsiOS,
+            macOS: detailsiOS,
+          ),
+          payload: alerte.id,
+        );
+        return;
+      }
 
       // Programmer la notification
       await _pluginNotifications.zonedSchedule(
@@ -523,7 +574,8 @@ class ServiceNotifications {
       badgeNumber: 1,
       attachments: [],
       subtitle: 'E-Santé 4.0',
-      interruptionLevel: alerte.type == TypeAlerte.critique
+      interruptionLevel: (alerte.type == TypeAlerte.critique ||
+              alerte.niveauNotification == NiveauNotification.urgence)
           ? InterruptionLevel.critical
           : InterruptionLevel.active,
       categoryIdentifier: _obtenirCategorieIOS(alerte),
@@ -745,7 +797,7 @@ class ServiceNotifications {
       titre,
       message,
       details,
-      payload: donnees != null ? donnees.toString() : null,
+      payload: donnees?.toString(),
     );
   }
 

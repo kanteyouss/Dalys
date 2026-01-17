@@ -34,8 +34,8 @@ class RiskLevelIndicator extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              color.withOpacity(0.1),
-              color.withOpacity(0.05),
+              color.withValues(alpha: 0.1),
+              color.withValues(alpha: 0.05),
             ],
           ),
         ),
@@ -46,7 +46,7 @@ class RiskLevelIndicator extends StatelessWidget {
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
                 border: Border.all(color: color, width: 3),
               ),
               child: Icon(

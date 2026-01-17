@@ -4,14 +4,18 @@ import '../controllers/health_controller.dart';
 import '../widgets/health_indicator_card.dart';
 import '../widgets/status_hero_section.dart';
 import '../widgets/medication_card.dart';
-import '../widgets/predictive_health_card.dart';
+import '../widgets/comprehensive_forecast_card.dart';
+import '../widgets/multi_horizon_alerts_widget.dart';
 import '../../ai_suggestions/widgets/carte_suggestion.dart';
 import '../../../data/services/service_ia_enhanced.dart';
 import '../../../data/models/modele_suggestion.dart';
 import '../../../data/models/health_data.dart';
 import '../../../data/models/fragility_models.dart';
 import '../../../data/models/patient_risk_profile.dart';
+import '../../../data/models/comprehensive_forecast_models.dart';
+import '../../../data/models/multi_horizon_alerts_models.dart';
 import '../../../data/services/fragility_score_service.dart';
+import '../../../data/services/health_forecast_service.dart';
 import '../../../data/services/database_service.dart';
 import '../../../data/services/auth_service.dart';
 import 'package:flutter/services.dart';
@@ -27,8 +31,11 @@ class HealthDashboard extends StatefulWidget {
 
 class _HealthDashboardState extends State<HealthDashboard> {
   List<Suggestion> _suggestions = [];
-  FragilityScore? _fragilityScore;
   bool _isLoadingScore = false;
+
+  // 🔮 NOUVEAUX ÉTATS POUR LES PRÉVISIONS AVANCÉES
+  ComprehensiveHealthForecast? _comprehensiveForecast;
+  bool _isLoadingForecast = false;
 
   @override
   void initState() {
@@ -59,26 +66,32 @@ class _HealthDashboardState extends State<HealthDashboard> {
 
   Future<void> _loadSuggestions() async {
     if (_isLoadingScore) return; // Éviter les appels multiples simultanés
-    
+
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
 
     final controller = context.read<HealthController>();
-    if (controller.currentHealthData != null && controller.currentHealthData!.userId != null) {
+    if (controller.currentHealthData != null &&
+        controller.currentHealthData!.userId != null) {
       final serviceIA = ServiceIAEnhanced();
       final suggestions = await serviceIA.getPredictiveSuggestions(
         controller.currentHealthData!,
         userId: controller.currentHealthData!.userId!,
       );
-      
+
       // Récupérer le score de fragilité via le service
-      final score = await _loadFragilityScore(controller.currentHealthData!.userId!);
-      
+      await _loadFragilityScore(controller.currentHealthData!.userId!);
+
+      // 🔮 CHARGER LES PRÉVISIONS COMPLÈTES
+      final forecast = await _loadComprehensiveForecast(
+          controller.currentHealthData!.userId!);
+
       if (mounted) {
         setState(() {
           _suggestions = suggestions;
-          _fragilityScore = score;
+          _comprehensiveForecast = forecast;
           _isLoadingScore = false;
+          _isLoadingForecast = false;
         });
       }
     }
@@ -89,7 +102,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
     try {
       final dbService = DatabaseService();
       final db = await dbService.database;
-      
+
       // Récupérer TOUTES les données de l'utilisateur (pas seulement 14 jours)
       // Pour permettre l'affichage même avec peu de données
       final results = await db.query(
@@ -97,14 +110,14 @@ class _HealthDashboardState extends State<HealthDashboard> {
         where: 'user_id = ?',
         whereArgs: [userId],
         orderBy: 'date DESC',
-        limit: 50,  // Plus de données pour meilleure analyse
+        limit: 50, // Plus de données pour meilleure analyse
       );
 
       if (results.isEmpty) {
         debugPrint('⚠️ Aucune donnée en DB pour userId=$userId');
         return null;
       }
-      
+
       debugPrint('✅ ${results.length} données trouvées pour userId=$userId');
 
       // Convertir et trier chronologiquement
@@ -125,19 +138,41 @@ class _HealthDashboardState extends State<HealthDashboard> {
           'risk_level': row['risk_level'],
         });
       }).toList();
-      
+
       // Trier chronologiquement (plus ancien en premier)
       history.sort((a, b) => a.date.compareTo(b.date));
-      
+
       final profile = PatientRiskProfile.createDefault(userId);
       final fragilityService = FragilityScoreService();
-      
+
       return await fragilityService.calculateCurrentFragility(history, profile);
     } catch (e) {
       debugPrint('❌ Erreur chargement score fragilité: $e');
       return null;
     } finally {
       _isLoadingScore = false;
+    }
+  }
+
+  /// 🔮 CHARGE LES PRÉVISIONS COMPLÈTES EXPLOITANT TOUT L'HISTORIQUE
+  Future<ComprehensiveHealthForecast?> _loadComprehensiveForecast(
+      int userId) async {
+    if (_isLoadingForecast) return null;
+
+    _isLoadingForecast = true;
+    try {
+      final healthForecastService = HealthForecastService();
+      final forecast =
+          await healthForecastService.generateComprehensiveForecast(userId);
+
+      debugPrint(
+          '✅ Prévision générée: ${forecast.dataPoints} points de données sur ${forecast.timeSpan.inDays}j');
+      return forecast;
+    } catch (e) {
+      debugPrint('❌ Erreur génération prévisions: $e');
+      return null;
+    } finally {
+      _isLoadingForecast = false;
     }
   }
 
@@ -222,193 +257,138 @@ class _HealthDashboardState extends State<HealthDashboard> {
               ? Colors.red.shade50.withOpacity(0.5)
               : Colors.transparent;
 
-          return RefreshIndicator(
-            onRefresh: () async {
-              await controller.refreshData();
-              await _loadSuggestions();
-            },
+          return DefaultTabController(
+            length: 3,
             child: Container(
               color: backgroundColor,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (isHighRisk) _buildCrisisBanner(),
-                    StatusHeroSection(riskLevel: currentData.riskLevel),
-                    const SizedBox(height: 24),
+              child: Column(
+                children: [
+                  StatusHeroSection(
+                    riskLevel: currentData.riskLevel,
+                    action: _buildSOSButton(context, isHighRisk, compact: true),
+                  ),
 
-                    // 🔮 PRÉVENTION PRÉDICTIVE - TOUJOURS VISIBLE
-                    _buildSectionHeader(
-                      context,
-                      '🔮 Prévention Intelligente',
-                      onInfo: () => _showPreventionInfo(context),
+                  // TabBar pour la navigation
+                  Container(
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(height: 12),
-                    
-                    // Afficher la carte si score disponible, sinon bouton d'accès
-                    if (_fragilityScore != null) ... [
-                      PredictiveHealthCard(
-                        score: _fragilityScore,
-                        onTap: () {
-                          final user = AuthService().currentUser;
-                          if (user != null) {
-                            Navigator.pushNamed(
-                              context,
-                              '/fragility-score',
-                              arguments: user.id,
-                            );
-                          }
-                        },
-                      ),
-                    ] else ... [
-                      // Carte placeholder quand pas de score
-                      Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        child: InkWell(
-                          onTap: () {
-                            final user = AuthService().currentUser;
-                            if (user != null) {
-                              Navigator.pushNamed(
+                    child: TabBar(
+                      tabs: const [
+                        Tab(text: 'Aujourd\'hui', icon: Icon(Icons.today)),
+                        Tab(text: 'Prévisions', icon: Icon(Icons.psychology)),
+                        Tab(text: 'Outils', icon: Icon(Icons.build)),
+                      ],
+                      labelColor: Theme.of(context).primaryColor,
+                      unselectedLabelColor: Colors.grey,
+                      indicatorSize: TabBarIndicatorSize.label,
+                      indicatorColor: Theme.of(context).primaryColor,
+                      dividerColor: Colors.transparent,
+                    ),
+                  ),
+
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        // ONGLET 1 : AUJOURD'HUI
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionHeader(
                                 context,
-                                '/fragility-score',
-                                arguments: user.id,
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Veuillez vous connecter')),
-                              );
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(16),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.auto_awesome, color: Colors.purple),
-                                    const SizedBox(width: 8),
-                                    const Expanded(
-                                      child: Text(
-                                        'Analyse Prédictive',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                      ),
-                                    ),
-                                    Icon(Icons.chevron_right, color: Colors.grey.shade600),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      _isLoadingScore ? Icons.hourglass_empty : Icons.info_outline,
-                                      size: 16,
-                                      color: Colors.orange,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _isLoadingScore 
-                                          ? 'Calcul en cours...'
-                                          : 'Appuyez pour voir votre score de fragilité',
-                                        style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'userId: ${currentData.userId ?? "non défini"} | Données: ${controller.historicalData.length}',
-                                  style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
-                                ),
-                              ],
-                            ),
+                                'Paramètres Vitaux',
+                                onInfo: () => _showGlobalInfo(context),
+                              ),
+                              const SizedBox(height: 12),
+                              _buildVitalsGrid(context, currentData, spo2Trend,
+                                  breathingTrend),
+                              const SizedBox(height: 12),
+                              HealthIndicatorCard(
+                                title: 'Souffle',
+                                value: '${currentData.pef.toInt()} L/min',
+                                icon: Icons.timeline,
+                                color: currentData.isPefNormal
+                                    ? Colors.green
+                                    : Colors.red,
+                                normalRange: '350-500 L/min',
+                                trend: pefTrend,
+                                onTap: () => _showParameterDetails(
+                                    context,
+                                    'Souffle',
+                                    '${currentData.pef.toInt()} L/min'),
+                              ),
+                              const SizedBox(height: 24),
+                              const MedicationCard(),
+                              const SizedBox(height: 24),
+                              _buildContextSection(context, currentData),
+                              const SizedBox(height: 40),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
 
-                    // Section: Paramètres Vitaux
-                    _buildSectionHeader(
-                      context,
-                      'Paramètres Vitaux',
-                      onInfo: () => _showGlobalInfo(context),
+                        // ONGLET 2 : PRÉVISIONS
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionHeader(
+                                context,
+                                '🔮 Intelligence Prédictive',
+                                onInfo: () =>
+                                    _showAdvancedForecastInfo(context),
+                              ),
+                              const SizedBox(height: 12),
+                              if (_comprehensiveForecast != null) ...[
+                                ComprehensiveForecastCard(
+                                  forecast: _comprehensiveForecast!,
+                                  onTap: () => _showForecastDetails(
+                                      context, _comprehensiveForecast!),
+                                ),
+                                const SizedBox(height: 16),
+                                if (_comprehensiveForecast!
+                                    .multiHorizonAlerts.hasAlerts)
+                                  MultiHorizonAlertsWidget(
+                                    alerts: _comprehensiveForecast!
+                                        .multiHorizonAlerts,
+                                    onViewDetails: () => _showAlertsDetails(
+                                        context,
+                                        _comprehensiveForecast!
+                                            .multiHorizonAlerts),
+                                  ),
+                              ] else
+                                _buildForecastLoadingCard(),
+                              const SizedBox(height: 40),
+                            ],
+                          ),
+                        ),
+
+                        // ONGLET 3 : OUTILS
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildTrainingSection(context),
+                              const SizedBox(height: 24),
+                              _buildQuickActions(context),
+                              const SizedBox(height: 40),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    if (isHighRisk) ... [
-                      _buildSOSButton(context, isHighRisk),
-                    ],
-
-                    // Vitals Grid
-                    _buildVitalsGrid(
-                        context, currentData, spo2Trend, breathingTrend),
-                    const SizedBox(height: 12),
-                    HealthIndicatorCard(
-                      title: 'Souffle',
-                      value: '${currentData.pef.toInt()} L/min',
-                      icon: Icons.timeline,
-                      color:
-                          currentData.isPefNormal ? Colors.green : Colors.red,
-                      normalRange: '350-500 L/min',
-                      trend: pefTrend,
-                      onTap: () => _showParameterDetails(context, 'Souffle',
-                          '${currentData.pef.toInt()} L/min'),
-                    ),
-
-                    const SizedBox(height: 24),
-                    const MedicationCard(),
-
-                    // Entraînement respiratoire
-                    const SizedBox(height: 24),
-                    _buildTrainingSection(context),
-
-                    // Contexte & Conseils (regroupés)
-                    if (!isHighRisk) ...[
-                      const SizedBox(height: 24),
-                      _buildContextSection(context, currentData),
-                    ],
-
-                    // Actions rapides (Bouton SOS en mode normal)
-                    const SizedBox(height: 24),
-                    if (!isHighRisk) _buildSOSButton(context, false),
-                    const SizedBox(height: 16),
-                    _buildQuickActions(context),
-                    const SizedBox(height: 100),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildCrisisBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.red.shade100,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade300),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.warning_rounded, color: Colors.red.shade700),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'ÉTAT CRITIQUE DÉTECTÉ : Restez calme et suivez les instructions.',
-              style: TextStyle(
-                  color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -448,9 +428,9 @@ class _HealthDashboardState extends State<HealthDashboard> {
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          _suggestions.isNotEmpty 
-            ? '${_suggestions.length} conseil(s) disponible(s)'
-            : 'Tout est normal',
+          _suggestions.isNotEmpty
+              ? '${_suggestions.length} conseil(s) disponible(s)'
+              : 'Tout est normal',
           style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
         ),
         children: [
@@ -459,7 +439,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (currentData.symptoms.isNotEmpty) ... [
+                if (currentData.symptoms.isNotEmpty) ...[
                   const Text(
                     'Symptômes signalés',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
@@ -468,7 +448,8 @@ class _HealthDashboardState extends State<HealthDashboard> {
                   _buildSymptomChips(currentData.symptoms),
                   const SizedBox(height: 16),
                 ],
-                if (currentData.temperature != null || currentData.humidity != null) ... [
+                if (currentData.temperature != null ||
+                    currentData.humidity != null) ...[
                   _buildEnvironmentalSection(context, currentData),
                   const SizedBox(height: 16),
                 ],
@@ -478,22 +459,25 @@ class _HealthDashboardState extends State<HealthDashboard> {
                     children: [
                       const Text(
                         'Conseils personnalisés',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       TextButton(
-                        onPressed: () => Navigator.pushNamed(context, '/suggestions'),
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/suggestions'),
                         child: const Text('Voir tout'),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   ..._suggestions.take(2).map((suggestion) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: CarteSuggestion(
-                      suggestion: suggestion,
-                      onTap: () => Navigator.pushNamed(context, '/suggestions'),
-                    ),
-                  )),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: CarteSuggestion(
+                          suggestion: suggestion,
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/suggestions'),
+                        ),
+                      )),
                 ],
               ],
             ),
@@ -503,7 +487,54 @@ class _HealthDashboardState extends State<HealthDashboard> {
     );
   }
 
-  Widget _buildSOSButton(BuildContext context, bool isHighRisk) {
+  Widget _buildSOSButton(BuildContext context, bool isHighRisk,
+      {bool compact = false}) {
+    if (compact) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            final user = AuthService().currentUser;
+            if (user != null) {
+              HapticFeedback.heavyImpact();
+              EmergencyCountdownOverlay.show(
+                  context, user, 'Déclenchement Manuel (SOS)');
+            }
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.red.shade600,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.red.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.emergency, color: Colors.white, size: 18),
+                SizedBox(width: 6),
+                Text(
+                  'SOS',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       margin: EdgeInsets.only(bottom: isHighRisk ? 24 : 0),
       child: InkWell(
@@ -520,9 +551,9 @@ class _HealthDashboardState extends State<HealthDashboard> {
           padding: EdgeInsets.all(isHighRisk ? 28 : 16),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: isHighRisk 
-                ? [Colors.red.shade700, Colors.red.shade500]
-                : [Colors.red.shade400, Colors.red.shade300],
+              colors: isHighRisk
+                  ? [Colors.red.shade800, Colors.red.shade600]
+                  : [Colors.red.shade600, Colors.red.shade400],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -875,5 +906,389 @@ class _HealthDashboardState extends State<HealthDashboard> {
       default:
         return 'Paramètre de santé important.';
     }
+  }
+
+  // 🔮 MÉTHODES POUR LES NOUVELLES FONCTIONNALITÉS AVANCÉES
+
+  Widget _buildForecastLoadingCard() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: _isLoadingForecast
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation(Colors.blue.shade600),
+                          ),
+                        )
+                      : Icon(Icons.auto_awesome, color: Colors.blue.shade700),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Prévisions IA Avancées',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+                      Text(
+                        _isLoadingForecast
+                            ? 'Analyse de vos données en cours...'
+                            : 'Génération des insights prédictifs',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (_isLoadingForecast) ...[
+              const SizedBox(height: 16),
+              LinearProgressIndicator(
+                backgroundColor: Colors.grey.shade200,
+                valueColor: AlwaysStoppedAnimation(Colors.blue.shade400),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAdvancedForecastInfo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('🔮 Intelligence Prédictive Avancée'),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                  'Notre nouveau système exploite TOUTES vos données historiques pour:'),
+              SizedBox(height: 12),
+              Text('🎯 Prédictions multi-horizon: 6h, 24h, 7 jours'),
+              SizedBox(height: 8),
+              Text(
+                  '📊 Analyse de tendances long-terme et patterns saisonniers'),
+              SizedBox(height: 8),
+              Text('⚠️ Alertes préventives intelligentes'),
+              SizedBox(height: 8),
+              Text('💡 Recommandations stratégiques personnalisées'),
+              SizedBox(height: 12),
+              Text(
+                  'Plus vous utilisez l\'app, plus les prédictions deviennent précises!'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Compris'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showForecastDetails(
+      BuildContext context, ComprehensiveHealthForecast forecast) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 550, maxHeight: 750),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child:
+                        Icon(Icons.auto_awesome, color: Colors.blue.shade700),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Analyse IA Détaillée',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const Divider(height: 32),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. RÉSUMÉ HAUTE-IMPACT
+                      _buildDetailSectionTitle(
+                          context, 'Résumé Décisionnel', Icons.psychology),
+                      const SizedBox(height: 12),
+                      _buildImpactRow(Icons.flash_on, 'Déclencheur',
+                          forecast.primaryTrigger, Colors.orange),
+                      if (forecast.actionWindow != null)
+                        _buildImpactRow(
+                            Icons.timer,
+                            'Fenêtre d\'action',
+                            'Environ ${forecast.actionWindow!.inHours} heures',
+                            Colors.red),
+                      _buildImpactRow(Icons.person_search, 'Norme Personnelle',
+                          forecast.personalNormComparison, Colors.blue),
+
+                      const SizedBox(height: 24),
+
+                      // 2. FIABILITÉ
+                      _buildDetailSectionTitle(context,
+                          'Fiabilité de la Prévision', Icons.verified_user),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.info_outline,
+                                    size: 18, color: Colors.blue.shade700),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    forecast.confidenceReason,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Analyse basée sur ${forecast.dataPoints} points de données sur les ${forecast.timeSpan.inDays} derniers jours.',
+                              style: TextStyle(
+                                  color: Colors.grey.shade600, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // 3. INSIGHTS & RECOMMANDATIONS
+                      _buildDetailSectionTitle(
+                          context, 'Insights & Actions', Icons.lightbulb),
+                      const SizedBox(height: 12),
+                      Text(forecast.executiveSummary,
+                          style: const TextStyle(fontStyle: FontStyle.italic)),
+                      const SizedBox(height: 16),
+                      ...forecast.personalizedInsights.significantInsights.map(
+                        (insight) => _buildInsightDetailCard(insight),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // 4. RECOMMANDATIONS CLÉS
+                      _buildDetailSectionTitle(context, 'Conseils Stratégiques',
+                          Icons.assignment_turned_in),
+                      const SizedBox(height: 12),
+                      ...forecast.keyRecommendations.map(
+                        (rec) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.check_circle,
+                                  size: 18, color: Colors.green.shade600),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(rec)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailSectionTitle(
+      BuildContext context, String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.grey.shade700),
+        const SizedBox(width: 8),
+        Text(
+          title.toUpperCase(),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey.shade700,
+            letterSpacing: 1.1,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImpactRow(
+      IconData icon, String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style:
+                        TextStyle(color: Colors.grey.shade600, fontSize: 11)),
+                Text(value,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInsightDetailCard(HealthInsight insight) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(insight.title,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(insight.description,
+                style: TextStyle(color: Colors.grey.shade800, fontSize: 13)),
+            if (insight.actionable && insight.action != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lightbulb_outline,
+                        size: 16, color: Colors.blue.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        insight.action!,
+                        style: TextStyle(
+                            color: Colors.blue.shade800,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAlertsDetails(BuildContext context, MultiHorizonAlerts alerts) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => Dialog(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.warning_amber, color: Colors.orange.shade600),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Toutes les Alertes',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const Divider(),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: MultiHorizonAlertsWidget(alerts: alerts),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
