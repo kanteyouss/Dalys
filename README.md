@@ -121,9 +121,18 @@ L'application utilise actuellement des données simulées réalistes :
 4. Ajouter les providers si nécessaire dans `main.dart`
 
 ### Intégration avec de vrais capteurs
-1. Remplacer `MockHealthProvider` par un provider réel
-2. Configurer la connexion Bluetooth/Wi-Fi
-3. Adapter les modèles de données si nécessaire
+1. **Mode Bluetooth** : L'app scanne automatiquement les appareils nommés `DALYS_ESP32`.
+2. **Mode WiFi (Direct)** : 
+   - Connectez votre téléphone au WiFi de l'ESP32 (`DALYS_SENSOR_WIFI`).
+   - L'app communiquera directement avec l'IP `192.168.4.1`.
+3. Adapter les modèles de données si nécessaire.
+
+## 📡 Configuration ESP32 (WiFi AP)
+Pour utiliser le mode WiFi direct, téléversez le code situé dans `DALYS-main/esp32_code.ino`.
+- **SSID** : `DALYS_SENSOR_WIFI`
+- **Password** : `dalys-password`
+- **IP** : `192.168.4.1` (automatique)
+- **Route** : `/data` (JSON)
 
 ## 🎨 Design et UX
 

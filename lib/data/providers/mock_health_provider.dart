@@ -24,28 +24,32 @@ class MockHealthProvider {
     // Simulation de données réalistes avec variations
     // 20% de chance de générer une valeur critique (pour tester l'IA)
     final criticalChance = _random.nextDouble();
-    
+
     int spo2;
     int breathingRate;
+    int heartRate;
     double pef;
-    
+
     if (criticalChance < 0.10) {
       // 10% - État TRÈS CRITIQUE
       spo2 = 85 + _random.nextInt(5); // 85-89%
       breathingRate = 25 + _random.nextInt(6); // 25-30 bpm
+      heartRate = 100 + _random.nextInt(30); // 100-130 bpm
       pef = 150.0 + _random.nextInt(100); // 150-250 L/min
     } else if (criticalChance < 0.25) {
       // 15% - État critique modéré
       spo2 = 90 + _random.nextInt(4); // 90-93%
       breathingRate = 21 + _random.nextInt(5); // 21-25 bpm
+      heartRate = 90 + _random.nextInt(20); // 90-110 bpm
       pef = 250.0 + _random.nextInt(100); // 250-350 L/min
     } else {
       // 75% - État normal
       spo2 = 95 + _random.nextInt(5); // 95-99%
       breathingRate = 14 + _random.nextInt(7); // 14-20 bpm
+      heartRate = 65 + _random.nextInt(25); // 65-90 bpm
       pef = 350.0 + _random.nextInt(150); // 350-500 L/min
     }
-    
+
     final temperature = 36.5 + _random.nextDouble(); // 36.5-37.5 °C
     final humidity = 40.0 + _random.nextInt(40); // 40-80%
     final envTemperature = 20.0 + _random.nextInt(10); // 20-30 °C
@@ -72,6 +76,7 @@ class MockHealthProvider {
     // Conditions de risque élevé
     if (spo2 < 92 ||
         breathingRate > 24 ||
+        (heartRate > 110) ||
         pef < 250 ||
         symptoms.contains('essoufflement')) {
       riskLevel = RiskLevel.high;
@@ -79,6 +84,7 @@ class MockHealthProvider {
     // Conditions de risque modéré
     else if (spo2 < 95 ||
         breathingRate > 20 ||
+        (heartRate > 95) ||
         pef < 350 ||
         symptoms.isNotEmpty) {
       riskLevel = RiskLevel.medium;
@@ -88,6 +94,7 @@ class MockHealthProvider {
       date: DateTime.now(),
       spo2: spo2,
       breathingRate: breathingRate,
+      heartRate: heartRate,
       pef: pef,
       temperature: temperature,
       humidity: humidity,
@@ -111,6 +118,7 @@ class MockHealthProvider {
       // Variation progressive des données pour simuler une évolution
       final baseSpo2 = 96 + (sin(i * 0.5) * 2).round();
       final baseBreathingRate = 18 + (cos(i * 0.3) * 2).round();
+      final baseHeartRate = 75 + (sin(i * 0.4) * 10).round();
       final basePef = 400 + (sin(i * 0.4) * 50);
       final baseTemp = 37.0 + (sin(i * 0.2) * 0.5);
 
@@ -119,6 +127,7 @@ class MockHealthProvider {
         spo2: (baseSpo2 + _random.nextInt(3) - 1).clamp(90, 99),
         breathingRate:
             (baseBreathingRate + _random.nextInt(3) - 1).clamp(12, 25),
+        heartRate: (baseHeartRate + _random.nextInt(10) - 5).clamp(60, 120),
         pef: (basePef + _random.nextInt(50) - 25).clamp(250, 500),
         temperature: (baseTemp + _random.nextDouble() - 0.5).clamp(36.0, 39.0),
         humidity: (60.0 + _random.nextInt(20)).toDouble(),

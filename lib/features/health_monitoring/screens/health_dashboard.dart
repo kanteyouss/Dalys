@@ -249,7 +249,6 @@ class _HealthDashboardState extends State<HealthDashboard> {
               history,
               currentData.breathingRate.toDouble(),
               (d) => d.breathingRate.toDouble());
-          final pefTrend =
               _calculateTrend(history, currentData.pef, (d) => d.pef);
 
           final isHighRisk = currentData.riskLevel == RiskLevel.high;
@@ -308,21 +307,8 @@ class _HealthDashboardState extends State<HealthDashboard> {
                               _buildVitalsGrid(context, currentData, spo2Trend,
                                   breathingTrend),
                               const SizedBox(height: 12),
-                              HealthIndicatorCard(
-                                title: 'Souffle',
-                                value: '${currentData.pef.toInt()} L/min',
-                                icon: Icons.timeline,
-                                color: currentData.isPefNormal
-                                    ? Colors.green
-                                    : Colors.red,
-                                normalRange: '350-500 L/min',
-                                trend: pefTrend,
-                                onTap: () => _showParameterDetails(
-                                    context,
-                                    'Souffle',
-                                    '${currentData.pef.toInt()} L/min'),
-                              ),
-                              const SizedBox(height: 24),
+                              _buildDataStatusIndicator(context, controller),
+                              const SizedBox(height: 12),
                               const MedicationCard(),
                               const SizedBox(height: 24),
                               _buildContextSection(context, currentData),
@@ -374,6 +360,8 @@ class _HealthDashboardState extends State<HealthDashboard> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              _buildDataModeSection(context, controller),
+                              const SizedBox(height: 24),
                               _buildTrainingSection(context),
                               const SizedBox(height: 24),
                               _buildQuickActions(context),
@@ -390,6 +378,162 @@ class _HealthDashboardState extends State<HealthDashboard> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildDataStatusIndicator(
+      BuildContext context, HealthController controller) {
+    final isSim = controller.isSimulationMode;
+    final isConnected = controller.isESP32Connected;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isSim
+            ? Colors.orange.withOpacity(0.1)
+            : Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isSim
+              ? Colors.orange.withOpacity(0.3)
+              : Colors.green.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isSim ? Icons.science : Icons.bluetooth_connected,
+            size: 16,
+            color: isSim ? Colors.orange : Colors.green,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            isSim ? 'Mode Simulation Actif' : 'Connecté à l\'ESP32',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isSim ? Colors.orange.shade800 : Colors.green.shade800,
+            ),
+          ),
+          if (!isSim && !isConnected) ...[
+            const SizedBox(width: 8),
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDataModeSection(
+      BuildContext context, HealthController controller) {
+    final theme = Theme.of(context);
+    final isSim = controller.isSimulationMode;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(context, 'Source des Données'),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.grey.shade200),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isSim
+                            ? Colors.orange.withOpacity(0.1)
+                            : theme.primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isSim ? Icons.science : Icons.settings_input_antenna,
+                        color: isSim ? Colors.orange : theme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isSim ? 'Mode Simulation' : 'Mode Capteur Réel',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          Text(
+                            isSim
+                                ? 'Données fictives pour test'
+                                : 'Données directes de l\'ESP32',
+                            style: TextStyle(
+                                color: Colors.grey.shade600, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: !isSim,
+                      onChanged: (value) async {
+                        await controller.toggleSimulationMode(!value);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(value
+                                  ? 'Tentative de connexion à l\'ESP32...'
+                                  : 'Mode Simulation activé'),
+                              backgroundColor:
+                                  value ? theme.primaryColor : Colors.orange,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      activeColor: theme.primaryColor,
+                    ),
+                  ],
+                ),
+                if (!isSim && !controller.isESP32Connected) ...[
+                  const Divider(height: 24),
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Recherche de l\'ESP32...',
+                          style: TextStyle(
+                              color: Colors.grey.shade600, fontSize: 12),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => controller.autoDetectESP32(),
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -611,35 +755,66 @@ class _HealthDashboardState extends State<HealthDashboard> {
     );
   }
 
-  Widget _buildVitalsGrid(BuildContext context, HealthData currentData,
-      Trend spo2Trend, Trend breathingTrend) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: HealthIndicatorCard(
-            title: 'Oxygène',
-            value: '${currentData.spo2}%',
-            icon: Icons.favorite,
-            color: currentData.isSpo2Normal ? Colors.green : Colors.red,
-            normalRange: '95-100%',
-            trend: spo2Trend,
-            onTap: () => _showParameterDetails(
-                context, 'Oxygène', currentData.spo2.toString()),
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: HealthIndicatorCard(
+                title: 'Oxygène',
+                value: '${currentData.spo2}%',
+                icon: Icons.favorite,
+                color: currentData.isSpo2Normal ? Colors.green : Colors.red,
+                normalRange: '95-100%',
+                trend: spo2Trend,
+                onTap: () => _showParameterDetails(
+                    context, 'Oxygène', currentData.spo2.toString()),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: HealthIndicatorCard(
+                title: 'Respiration',
+                value: '${currentData.breathingRate} bpm',
+                icon: Icons.air,
+                color: currentData.isBreathingRateNormal
+                    ? Colors.green
+                    : Colors.red,
+                normalRange: '12-20 bpm',
+                trend: breathingTrend,
+                onTap: () => _showParameterDetails(
+                    context, 'Respiration', '${currentData.breathingRate} bpm'),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: HealthIndicatorCard(
-            title: 'Respiration',
-            value: '${currentData.breathingRate} bpm',
-            icon: Icons.air,
-            color:
-                currentData.isBreathingRateNormal ? Colors.green : Colors.red,
-            normalRange: '12-20 bpm',
-            trend: breathingTrend,
-            onTap: () => _showParameterDetails(
-                context, 'Respiration', '${currentData.breathingRate} bpm'),
-          ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: HealthIndicatorCard(
+                title: 'Pouls',
+                value: '${currentData.heartRate ?? "--"} bpm',
+                icon: Icons.pulse_instrument,
+                color: currentData.isHeartRateNormal ? Colors.green : Colors.red,
+                normalRange: '60-100 bpm',
+                onTap: () => _showParameterDetails(
+                    context, 'Pouls', '${currentData.heartRate ?? "--"} bpm'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: HealthIndicatorCard(
+                title: 'Souffle (PEF)',
+                value: '${currentData.pef.toInt()} L/min',
+                icon: Icons.speed,
+                color: currentData.isPefNormal ? Colors.green : Colors.red,
+                normalRange: '> 350 L/min',
+                onTap: () => _showParameterDetails(context, 'Souffle',
+                    '${currentData.pef.toInt()} L/min'),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -903,6 +1078,8 @@ class _HealthDashboardState extends State<HealthDashboard> {
         return 'La normale se situe entre 36.5°C et 37.5°C.';
       case 'Humidité':
         return 'Un taux entre 40% et 60% est idéal pour le confort respiratoire.';
+      case 'Pouls':
+        return 'La fréquence cardiaque (pouls) mesure le nombre de battements du cœur par minute. La normale au repos se situe entre 60 et 100 bpm.';
       default:
         return 'Paramètre de santé important.';
     }

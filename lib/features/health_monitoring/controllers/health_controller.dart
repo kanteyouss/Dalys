@@ -67,10 +67,35 @@ class HealthController extends ChangeNotifier {
   /// Initialise le contrôleur et charge les données
   Future<void> initialize() async {
     await loadHealthData();
-    _startRealTimeUpdates();
+    // Tenter une détection automatique au démarrage
+    autoDetectESP32();
   }
 
+  /// Tente de détecter et se connecter à l'ESP32 automatiquement
+  Future<void> autoDetectESP32() async {
+    _error = null;
+    _setLoading(true);
+    notifyListeners();
+
+    final connected = await _sensorService.connect();
+
+    if (connected) {
+      await toggleSimulationMode(false);
+    } else {
+      _error = "ESP32 non détecté, mode simulation activé";
+      _isSimulationMode = true;
+      _startRealTimeUpdates();
+    }
+
+    _setLoading(false);
+    notifyListeners();
+  }
+
+  bool get isESP32Connected => _sensorService.isConnected;
+
   Future<void> toggleSimulationMode(bool value) async {
+    if (_isSimulationMode == value && _healthDataSubscription != null) return;
+
     _isSimulationMode = value;
     stopRealTimeUpdates();
 
@@ -79,7 +104,12 @@ class HealthController extends ChangeNotifier {
       try {
         _setLoading(true);
         notifyListeners();
-        final connected = await _sensorService.connect();
+
+        bool connected = _sensorService.isConnected;
+        if (!connected) {
+          connected = await _sensorService.connect();
+        }
+
         if (!connected) {
           _error = "Impossible de se connecter aux capteurs ESP32";
           _isSimulationMode = true; // Revenir en simulation
@@ -91,7 +121,8 @@ class HealthController extends ChangeNotifier {
         _setLoading(false);
       }
     } else {
-      await _sensorService.disconnect();
+      // On ne déconnecte pas forcément physiquement l'ESP32 pour permettre un retour rapide,
+      // mais on arrête d'écouter son flux.
     }
 
     _startRealTimeUpdates();
