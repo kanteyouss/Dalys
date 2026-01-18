@@ -88,6 +88,27 @@ L'application utilise un système de couleurs simple pour vous informer rapideme
 - 🟡 **ORANGE** = Attention, surveillez cette valeur
 - 🔴 **ROUGE** = Alerte ! Cette valeur nécessite votre attention
 
+## ❓ Où se trouve le bouton d'action ?
+
+### 🔍 Localisation du bouton "Nouvelle mesure"
+
+Le **bouton d'action principal** de l'application est situé **en bas à droite** de votre écran. Voici comment le reconnaître :
+
+- **Forme** : Bouton oval/arrondi qui "flotte" au-dessus du contenu
+- **Couleur** : Bleu médical (couleur principale de l'application)
+- **Icône** : Cercle avec un symbole "+" à l'intérieur
+- **Texte** : Affiche le texte **"Nouvelle mesure"**
+- **Position** : Toujours visible en bas à droite, même quand vous faites défiler la page
+
+> 📍 **Important** : Ce bouton reste fixé en bas à droite de l'écran et ne disparaît jamais, vous permettant d'ajouter une mesure à tout moment, quelle que soit la section du dashboard que vous consultez.
+
+### 🎯 À quoi sert ce bouton ?
+
+Lorsque vous appuyez sur le bouton "Nouvelle mesure", une fenêtre s'ouvre vous permettant de :
+- Saisir manuellement vos paramètres vitaux (SpO₂, respiration, débit de pointe)
+- Indiquer vos symptômes actuels
+- Enregistrer ces informations pour un suivi continu
+
 ## 📱 Comment utiliser cette fonctionnalité
 
 ### Étape 1 : Ouvrir l'application
@@ -100,9 +121,13 @@ L'application utilise un système de couleurs simple pour vous informer rapideme
 - L'indicateur de risque global vous donne une vue d'ensemble
 
 ### Étape 3 : Ajouter une nouvelle mesure
-- Appuyez sur le bouton "Nouvelle mesure" en bas à droite
+- **Localisez le bouton d'action** : Cherchez le bouton oval **"Nouvelle mesure"** qui flotte en bas à droite de votre écran (bouton rond avec une icône +)
+- **Appuyez sur ce bouton** pour ouvrir le formulaire de saisie
 - Entrez vos valeurs manuellement (si vous avez un appareil de mesure)
 - Sélectionnez vos symptômes si vous en ressentez
+- Appuyez sur **"Enregistrer"** pour sauvegarder vos données
+
+> 💡 **Astuce** : Le bouton "Nouvelle mesure" est toujours visible en bas à droite de l'écran, même lorsque vous faites défiler la page. Il a une couleur bleue distinctive et affiche une icône de cercle avec un plus (+).
 
 ## 🎯 Scénarios d'utilisation concrets
 
@@ -210,6 +235,31 @@ Pour chaque paramètre, vous voyez :
 4. 👥 **Prévenez un proche** de votre état
 
 **Cette application est un outil d'aide mais ne remplace jamais l'avis médical professionnel.**
+
+---
+
+## ❓ Questions Fréquentes (FAQ)
+
+### Où se trouve le bouton pour ajouter une nouvelle mesure ?
+Le bouton **"Nouvelle mesure"** est un bouton oval bleu situé en **bas à droite de l'écran**. Il comporte une icône de cercle avec un "+" et reste visible en permanence, même lorsque vous faites défiler la page vers le haut ou le bas.
+
+### Comment ajouter mes propres mesures ?
+1. Appuyez sur le bouton **"Nouvelle mesure"** en bas à droite
+2. Remplissez les champs avec vos valeurs mesurées
+3. Sélectionnez vos symptômes éventuels
+4. Appuyez sur **"Enregistrer"**
+
+### Le bouton d'action est-il toujours visible ?
+Oui ! Le bouton "Nouvelle mesure" est un bouton flottant (FloatingActionButton) qui reste fixe en bas à droite de l'écran, quelle que soit votre position dans le dashboard.
+
+### Que faire si je ne vois pas le bouton ?
+- Assurez-vous que l'application est complètement chargée
+- Vérifiez en bas à droite de votre écran
+- Le bouton devrait être au-dessus du contenu avec une couleur bleue distinctive
+- Essayez de faire défiler légèrement la page pour vérifier sa présence
+
+### Puis-je ajouter des mesures à tout moment ?
+Oui ! Le bouton "Nouvelle mesure" est accessible à tout moment depuis le dashboard principal. Vous pouvez ajouter autant de mesures que nécessaire pour un suivi optimal de votre santé.
 
 ---
 

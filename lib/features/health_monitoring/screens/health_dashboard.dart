@@ -326,6 +326,8 @@ class _HealthDashboardState extends State<HealthDashboard> {
         icon: const Icon(Icons.add_circle_outline),
         label: const Text('Nouvelle mesure'),
         backgroundColor: Theme.of(context).primaryColor,
+        tooltip: 'Ajouter une nouvelle mesure de santé',
+        heroTag: 'add_measurement_fab',
       ),
     );
   }
