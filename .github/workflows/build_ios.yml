@@ -2,7 +2,7 @@ name: Build iOS
 
 on:
   push:
-    branches: [ "feature/ios-ci", "main" ]
+    branches: [ "feature/ios-ci", "main", "V8-IOS" ]
   pull_request:
     branches: [ "main" ]
 
