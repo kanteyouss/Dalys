@@ -74,7 +74,7 @@ Si vous n'avez pas de Mac, utilisez cette méthode.
     ```bash
     git add .
     git commit -m "Déclenchement build iOS"
-    git push origin feature/ios-ci
+    git push origin V8-IOS
     ```
 
 2.  **Récupérer l'application** :
