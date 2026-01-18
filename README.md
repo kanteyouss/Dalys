@@ -23,6 +23,7 @@ E-Santé 4.0 - DALYS est une application mobile développée en Flutter qui util
 - **Système de Risque** : Classification automatique (Faible/Moyen/Élevé)
 - **Graphiques d'Évolution** : Courbes temporelles avec données simulées
 - **Interface Responsive** : Design adaptatif pour différentes tailles d'écran
+- **Saisie Manuelle de Mesures** : Bouton d'action "Nouvelle mesure" situé en bas à droite pour ajouter vos données
 
 ### ⏳ En Développement
 - **Alertes Intelligentes** : Notifications prédictives basées sur l'IA
