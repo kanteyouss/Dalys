@@ -16,7 +16,12 @@ class EmergencyEvent {
 /// Contrôleur principal pour la gestion des alertes médicales et environnementales
 class ControleurAlertes extends ChangeNotifier {
   DateTime? _lastEmergencyTrigger;
-  static const Duration _emergencyCooldown = Duration(minutes: 1);
+  // Cooldown entre deux urgences automatiques (1 minute pour éviter l'empilement)
+  final Duration _emergencyCooldown = const Duration(minutes: 1);
+
+  // Cooldown entre deux mises à jour d'urgence (1 minute pour éviter le spam)
+  final Duration _updateCooldown = const Duration(minutes: 1);
+  DateTime? _lastUpdateTrigger;
   final AuthService _authService = AuthService();
   final List<ModeleAlerte> _listeAlertes = [];
   bool _estEnChargement = false;
@@ -109,6 +114,10 @@ class ControleurAlertes extends ChangeNotifier {
 
       // S'abonner aux urgences
       EmergencyService().onEmergency.listen((description) {
+        _lastEmergencyTrigger = DateTime.now(); // Synchroniser le cooldown
+        _lastUpdateTrigger =
+            DateTime.now(); // Éviter une MAJ immédiate après déclenchement
+
         _creerAlerteSiNecessaire(
           idPrefix: 'emergency_auto',
           titre: '🚨 URGENCE DÉCLENCHÉE',
@@ -171,6 +180,9 @@ class ControleurAlertes extends ChangeNotifier {
       },
     );
 
+    // Flag pour éviter de déclencher plusieurs urgences dans la même boucle
+    bool emergencyTriggeredThisLoop = false;
+
     for (var alerte in predictions) {
       ajouterAlerte(
           alerte.copierAvec(idUtilisateur: _currentUserId.toString()));
@@ -188,11 +200,15 @@ class ControleurAlertes extends ChangeNotifier {
         }
 
         // Déclenchement automatique si TRÈS critique
-        if (riskScore > 80 || healthData.spo2 < 90) {
-          await _triggerAutomaticEmergency(
+        if ((riskScore > 80 || healthData.spo2 < 90) &&
+            !emergencyTriggeredThisLoop) {
+          final triggered = await _triggerAutomaticEmergency(
             'Risque IA Critique (${riskScore.toInt()}%) : ${alerte.titre}',
             healthData,
           );
+          if (triggered) {
+            emergencyTriggeredThisLoop = true;
+          }
         }
       }
     }
@@ -249,7 +265,8 @@ class ControleurAlertes extends ChangeNotifier {
   }
 
   /// Déclenche automatiquement le protocole d'urgence pour les cas très critiques
-  Future<void> _triggerAutomaticEmergency(
+  /// Retourne true si l'urgence a été déclenchée
+  Future<bool> _triggerAutomaticEmergency(
       String stateDescription, dynamic healthData) async {
     // Vérifier le cooldown pour éviter les envois multiples
     final now = DateTime.now();
@@ -258,8 +275,33 @@ class ControleurAlertes extends ChangeNotifier {
       if (timeSinceLastTrigger < _emergencyCooldown) {
         debugPrint(
             '⚠️ Urgence automatique ignorée (cooldown actif: ${_emergencyCooldown.inMinutes - timeSinceLastTrigger.inMinutes} min restantes)');
-        return;
+        return false;
       }
+    }
+
+    // Vérifier si une urgence est déjà active au niveau du service
+    if (EmergencyService().isEmergencyActive) {
+      // Stratégie "Mise à jour d'urgence" : Informer sans redéclencher
+      final timeSinceLastUpdate = _lastUpdateTrigger == null
+          ? const Duration(hours: 1)
+          : now.difference(_lastUpdateTrigger!);
+
+      if (timeSinceLastUpdate >= _updateCooldown) {
+        debugPrint('📢 DÉCLENCHEMENT D\'UNE MISE À JOUR D\'URGENCE');
+        _lastUpdateTrigger = now;
+
+        final user = _authService.currentUser;
+        if (user != null) {
+          await EmergencyService().sendEmergencyUpdate(
+            user,
+            stateDescription,
+            recentHistory: healthData != null ? [healthData] : null,
+          );
+        }
+      } else {
+        debugPrint('⚠️ Mise à jour d\'urgence ignorée (cooldown actif)');
+      }
+      return false;
     }
 
     // Récupérer l'utilisateur actuel
@@ -267,11 +309,13 @@ class ControleurAlertes extends ChangeNotifier {
     if (user == null) {
       debugPrint(
           '❌ Impossible de déclencher l\'urgence: utilisateur non connecté');
-      return;
+      return false;
     }
 
     debugPrint('🚨 DÉCLENCHEMENT AUTOMATIQUE D\'URGENCE - $stateDescription');
     _lastEmergencyTrigger = now;
+    _lastUpdateTrigger =
+        now; // Éviter une MAJ immédiate après déclenchement automatique
 
     // Déclencher le protocole d'urgence SANS compte à rebours
     await EmergencyService().triggerEmergencyProtocol(
@@ -280,6 +324,7 @@ class ControleurAlertes extends ChangeNotifier {
       recentHistory: healthData != null ? [healthData] : null,
       isAutomatic: true, // ← IMPORTANT : Marquer comme automatique
     );
+    return true;
   }
 
   void definirTermeRecherche(String terme) {

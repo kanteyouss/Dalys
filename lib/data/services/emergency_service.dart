@@ -18,10 +18,12 @@ class EmergencyService {
   final ServiceVocal _vocalService = ServiceVocal();
   Timer? _countdownTimer;
   bool _isEmergencyPending = false;
+  bool _isEmergencyActive = false;
   StreamSubscription<Position>? _locationStreamSubscription;
   Position? _lastPosition;
 
   bool get isEmergencyPending => _isEmergencyPending;
+  bool get isEmergencyActive => _isEmergencyActive;
 
   // Stream pour notifier les autres composants (ex: ControleurAlertes) d'une urgence
   final _onEmergencyTriggered = StreamController<String>.broadcast();
@@ -33,9 +35,13 @@ class EmergencyService {
       Function()? onComplete,
       List<HealthData>? recentHistory,
       String? intendedDestination}) {
-    if (_isEmergencyPending) return;
+    if (_isEmergencyPending || _isEmergencyActive) {
+      debugPrint('⚠️ Ignoré : Une urgence est déjà en cours ou en attente.');
+      return;
+    }
 
     _isEmergencyPending = true;
+    _isEmergencyActive = true; // Verrouiller immédiatement
     int remaining = MedicalConfig.emergencyCountdownSeconds;
 
     onTick?.call(remaining);
@@ -84,6 +90,7 @@ class EmergencyService {
   void cancelEmergency() {
     _countdownTimer?.cancel();
     _isEmergencyPending = false;
+    _isEmergencyActive = false; // Libérer le verrou
     _stopLocationTracking();
     debugPrint('🛑 URGENCE ANNULÉE PAR L\'UTILISATEUR');
   }
@@ -93,6 +100,14 @@ class EmergencyService {
       {List<HealthData>? recentHistory,
       String? intendedDestination,
       bool isAutomatic = false}) async {
+    // Si c'est automatique et qu'une urgence est déjà active, on ignore
+    if (isAutomatic && _isEmergencyActive) {
+      debugPrint(
+          '⚠️ Ignoré : Urgence automatique bloquée car une urgence est déjà active.');
+      return;
+    }
+
+    _isEmergencyActive = true; // Verrouiller l'état d'urgence
     debugPrint('🚨 PROTOCOLE D\'URGENCE DÉCLENCHÉ 🚨');
     debugPrint(isAutomatic ? '🤖 Type: AUTOMATIQUE' : '👤 Type: MANUEL');
 
@@ -120,6 +135,29 @@ class EmergencyService {
 
     // 5. Notifier les abonnés internes (ex: Historique des notifications)
     _onEmergencyTriggered.add(stateDescription);
+  }
+
+  /// Envoie une mise à jour de l'état aux contacts sans relancer le protocole complet
+  Future<void> sendEmergencyUpdate(UserModel user, String stateDescription,
+      {List<HealthData>? recentHistory}) async {
+    if (!_isEmergencyActive) return;
+
+    debugPrint('📢 ENVOI D\'UNE MISE À JOUR D\'URGENCE : $stateDescription');
+
+    // 1. Annonce vocale courte
+    await _vocalService.parler(
+      "Mise à jour de l'état envoyée : $stateDescription",
+      niveau: NiveauNotification.alerte,
+    );
+
+    // 2. Envoi des alertes de mise à jour
+    await _sendAlertsToContacts(
+      user,
+      _lastPosition,
+      stateDescription,
+      recentHistory: recentHistory,
+      isUpdate: true,
+    );
   }
 
   Future<Position?> _getCurrentLocation() async {
@@ -242,7 +280,8 @@ class EmergencyService {
       UserModel user, Position? position, String state,
       {List<HealthData>? recentHistory,
       String? intendedDestination,
-      bool isAutomatic = false}) async {
+      bool isAutomatic = false,
+      bool isUpdate = false}) async {
     final now = DateTime.now();
     final timeStr =
         "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
@@ -251,9 +290,16 @@ class EmergencyService {
         ? 'https://www.google.com/maps/search/?api=1&query=${position.latitude},${position.longitude}'
         : '';
 
-    final alertType =
-        isAutomatic ? '🤖 ALERTE AUTOMATIQUE' : '👤 ALERTE MANUELLE';
-    final alertTypeShort = isAutomatic ? 'Auto' : 'Manuel';
+    String alertType;
+    String alertTypeShort;
+
+    if (isUpdate) {
+      alertType = '📢 MISE À JOUR D\'URGENCE';
+      alertTypeShort = 'MAJ';
+    } else {
+      alertType = isAutomatic ? '🤖 ALERTE AUTOMATIQUE' : '👤 ALERTE MANUELLE';
+      alertTypeShort = isAutomatic ? 'Auto' : 'Manuel';
+    }
 
     // 1. Envoi au Proche (Rassurant, Actions simples)
     if (user.emergencyContactEmail != null &&
@@ -475,5 +521,14 @@ class EmergencyService {
         <p style="margin-top: 20px;"><strong>CONTACT :</strong> ${user.telephone ?? "N/A"}</p>
       </div>
     ''';
+  }
+
+  /// Réinitialise l'état d'urgence (à utiliser avec précaution)
+  void resetEmergencyState() {
+    _isEmergencyActive = false;
+    _isEmergencyPending = false;
+    _countdownTimer?.cancel();
+    _stopLocationTracking();
+    debugPrint('🔄 État d\'urgence réinitialisé manuellement');
   }
 }

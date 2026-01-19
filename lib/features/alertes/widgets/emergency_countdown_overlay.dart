@@ -21,16 +21,26 @@ class EmergencyCountdownOverlay extends StatefulWidget {
     required this.onCancel,
   });
 
+  static bool isShowing = false;
+
   static void show(
       BuildContext context, UserModel user, String stateDescription) {
+    // Empêcher l'empilement des overlays
+    if (isShowing) {
+      debugPrint('⚠️ Overlay urgence déjà affiché - Ignoré');
+      return;
+    }
+
     // Vérifier que le contexte a bien un Navigator
     try {
       Navigator.of(context);
     } catch (e) {
-      debugPrint('❌ Erreur: Context sans Navigator actif pour EmergencyCountdownOverlay: $e');
+      debugPrint(
+          '❌ Erreur: Context sans Navigator actif pour EmergencyCountdownOverlay: $e');
       return;
     }
-    
+
+    isShowing = true;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -39,7 +49,7 @@ class EmergencyCountdownOverlay extends StatefulWidget {
         stateDescription: stateDescription,
         onCancel: () => Navigator.of(context).pop(),
       ),
-    );
+    ).then((_) => isShowing = false); // Réinitialiser le flag à la fermeture
   }
 
   @override
@@ -58,6 +68,10 @@ class _EmergencyCountdownOverlayState extends State<EmergencyCountdownOverlay> {
   @override
   void initState() {
     super.initState();
+
+    // ✅ INITIALISER et DÉMARRER l'écoute vocale AVANT le compte à rebours
+    _initializeVoiceRecognition();
+
     _emergencyService.triggerEmergencyWithCountdown(
       widget.user,
       widget.stateDescription,
@@ -67,8 +81,14 @@ class _EmergencyCountdownOverlayState extends State<EmergencyCountdownOverlay> {
           setState(() => _remainingSeconds = seconds);
           // Feedback sensoriel à chaque seconde
           HapticFeedback.heavyImpact();
-          _vocalService.parler(seconds.toString(),
-              niveau: NiveauNotification.urgence); // Optionnel: dire le chiffre
+
+          // Rappel vocal à mi-parcours
+          if (seconds == 5) {
+            _vocalService.parler(
+              "Dites 'je vais bien' pour annuler l'alerte",
+              niveau: NiveauNotification.urgence,
+            );
+          }
         }
       },
       onComplete: () {
@@ -77,15 +97,49 @@ class _EmergencyCountdownOverlayState extends State<EmergencyCountdownOverlay> {
         }
       },
     );
+  }
 
-    // Démarrer l'écoute vocale pour l'annulation
-    _voiceService.startListening();
-    _voiceSubscription = _voiceService.wordsStream.listen((word) {
-      if (_voiceService.isCancel(word)) {
-        debugPrint('🎤 ANNULATION VOCALE DÉTECTÉE');
-        _cancelEmergency();
+  /// Initialise la reconnaissance vocale et configure l'écoute
+  Future<void> _initializeVoiceRecognition() async {
+    try {
+      // Initialiser le service de reconnaissance
+      final initialized = await _voiceService.initialize();
+      if (!initialized) {
+        debugPrint('⚠️ Reconnaissance vocale non disponible');
+        // Continuer quand même, l'utilisateur peut toujours appuyer sur le bouton
+        return;
       }
-    });
+
+      // Démarrer l'écoute vocale
+      await _voiceService.startListening();
+
+      // Annonce vocale initiale
+      await _vocalService.parler(
+        "Alerte d'urgence déclenchée. Dites 'je vais bien' pour annuler.",
+        niveau: NiveauNotification.urgence,
+      );
+
+      // Écouter les mots reconnus
+      _voiceSubscription = _voiceService.wordsStream.listen((text) {
+        debugPrint('🎤 Reconnaissance: "$text"');
+
+        if (_voiceService.isCancel(text)) {
+          debugPrint('✅ ANNULATION VOCALE DÉTECTÉE: "$text"');
+
+          // Confirmation vocale
+          _vocalService.parler(
+            "Annulation confirmée. Vous allez bien.",
+            niveau: NiveauNotification.alerte,
+          );
+
+          // Annuler l'urgence
+          _cancelEmergency();
+        }
+      });
+    } catch (e) {
+      debugPrint('❌ Erreur initialisation reconnaissance vocale: $e');
+      // L'utilisateur peut toujours utiliser le bouton tactile
+    }
   }
 
   void _cancelEmergency() {
@@ -237,16 +291,42 @@ class _EmergencyCountdownOverlayState extends State<EmergencyCountdownOverlay> {
 
                   const SizedBox(height: 16),
 
-                  // Option vocale
-                  TextButton.icon(
-                    onPressed: () {
-                      // Ici on pourrait forcer l'ouverture du micro pour parler
-                      HapticFeedback.mediumImpact();
-                    },
-                    icon: const Icon(Icons.mic, color: Colors.blueAccent),
-                    label: const Text(
-                      'Parler pour préciser mon état',
-                      style: TextStyle(color: Colors.blueAccent, fontSize: 16),
+                  // Option vocale avec indication claire
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border:
+                          Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _voiceService.isListening ? Icons.mic : Icons.mic_off,
+                          color: _voiceService.isListening
+                              ? Colors.green
+                              : Colors.grey,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _voiceService.isListening
+                                ? '🎤 Dites "je vais bien" pour annuler'
+                                : '🎤 Microphone non disponible - Utilisez le bouton',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _voiceService.isListening
+                                  ? Colors.blueAccent
+                                  : Colors.grey,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

@@ -157,24 +157,39 @@ class _MainWrapperState extends State<MainWrapper> {
     });
 
     // Écoute vocale globale pour déclencher une urgence
-    _voiceService.startListening();
-    _voiceSubscription = _voiceService.wordsStream.listen((word) {
-      if (_voiceService.isEmergency(word)) {
-        final user = AuthService().currentUser;
-        final navContext = MyApp.navigatorKey.currentContext;
-        if (user != null && navContext != null && mounted) {
-          final declaredState = _voiceService.getDeclaredState(word);
-          debugPrint('🎤 DÉCLENCHEMENT VOCAL D\'URGENCE : $declaredState');
+    _initializeGlobalVoiceRecognition();
+  }
 
-          // Confirmation vocale immédiate pour rassurer l'utilisateur
-          ServiceVocal().parler(
-              "Alerte détectée. Lancement du protocole d'urgence.",
-              niveau: NiveauNotification.urgence);
+  /// Initialise la reconnaissance vocale globale pour détecter les urgences
+  Future<void> _initializeGlobalVoiceRecognition() async {
+    try {
+      // Initialiser le service
+      await _voiceService.initialize();
+      
+      // Démarrer l'écoute
+      await _voiceService.startListening();
+      
+      _voiceSubscription = _voiceService.wordsStream.listen((text) {
+        if (_voiceService.isEmergency(text)) {
+          final user = AuthService().currentUser;
+          final navContext = MyApp.navigatorKey.currentContext;
+          if (user != null && navContext != null && mounted) {
+            final declaredState = _voiceService.getDeclaredState(text);
+            debugPrint('🎤 DÉCLENCHEMENT VOCAL D\'URGENCE : $declaredState');
 
-          EmergencyCountdownOverlay.show(navContext, user, declaredState);
+            // Confirmation vocale immédiate pour rassurer l'utilisateur
+            ServiceVocal().parler(
+                "Alerte détectée. Lancement du protocole d'urgence.",
+                niveau: NiveauNotification.urgence);
+
+            EmergencyCountdownOverlay.show(navContext, user, declaredState);
+          }
         }
-      }
-    });
+      });
+    } catch (e) {
+      debugPrint('⚠️ Reconnaissance vocale globale non disponible: $e');
+      // L'application continue de fonctionner normalement
+    }
   }
 
   @override

@@ -1,0 +1,38 @@
+# PLACEHOLDER - Fichier son Android
+
+Ce fichier est un placeholder. Remplacez-le par:
+
+**Nom du fichier:** medication_reminder.mp3
+
+**Caractéristiques recommandées:**
+- Format: MP3
+- Durée: 2-3 secondes
+- Bitrate: 128 kbps minimum
+- Type: Son doux, carillon apaisant, tonalité médicale douce
+- Volume: Modéré (pas trop fort)
+
+**Où trouver/créer le son:**
+
+1. **Sites gratuits:**
+   - Freesound.org: Rechercher "gentle reminder", "soft notification", "medical alert soft"
+   - Zapsplat.com: Catégorie "Notifications > Medical"
+   - Pixabay.com/music: Sons gratuits sans attribution
+
+2. **Créer vous-même:**
+   - GarageBand (Mac): Utiliser des sons de carillon
+   - Audacity (gratuit): Générer tonalité + reverb
+   - FamiStudio: Sons rétro doux
+
+3. **Exemples de recherche:**
+   - "soft chime notification"
+   - "gentle medical reminder"
+   - "pleasant alarm tone"
+   - "soothing notification sound"
+
+**Instructions:**
+1. Télécharger/créer votre son
+2. Le renommer en: medication_reminder.mp3
+3. Le placer dans: android/app/src/main/res/raw/
+4. Supprimer ce fichier placeholder
+
+**IMPORTANT:** Le nom DOIT être exactement "medication_reminder.mp3" (minuscules, underscores)

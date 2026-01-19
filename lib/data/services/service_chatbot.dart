@@ -31,6 +31,7 @@ class ServiceChatbot {
   String _severiteCollectee = 'leger';
 
   int? get _currentUserId => _authService.currentUser?.id;
+  String? get _userPrenom => _authService.currentUser?.prenom;
 
   /// Initialise le service et charge l'historique
   Future<List<MessageChatbot>> initialiser() async {
@@ -54,8 +55,8 @@ class ServiceChatbot {
     final messageUser = MessageChatbot.user(messageUtilisateur);
     await _serviceHistorique.sauvegarderMessage(messageUser, userId);
 
-    // Simulation de latence
-    await Future.delayed(Duration(milliseconds: 500 + _random.nextInt(1000)));
+    // Simulation de latence réduite pour plus de réactivité
+    await Future.delayed(Duration(milliseconds: 200 + _random.nextInt(300)));
 
     MessageChatbot reponse;
 
@@ -93,8 +94,9 @@ class ServiceChatbot {
     // 2. Salutations
     if (_contientMotCle(
         messageMinuscule, ['bonjour', 'salut', 'hello', 'coucou'])) {
+      final nom = _userPrenom != null ? ' $_userPrenom' : '';
       return MessageChatbot.assistant(
-        'Bonjour ! Je suis votre assistant santé DALYS. Comment puis-je vous aider ?',
+        'Bonjour$nom ! Je suis votre assistant santé DALYS. Comment puis-je vous aider ?',
         quickReplies: ['Mes symptômes', 'Données vitales', 'Conseils'],
       );
     }
@@ -134,6 +136,25 @@ class ServiceChatbot {
       );
     }
 
+    // 6. Gestion des intentions générales (Politesse, Oui/Non)
+    final intention = _serviceNLP.detecterIntention(message);
+    if (intention != null) {
+      if (intention == 'merci') {
+        return MessageChatbot.assistant(
+          'Je vous en prie ! N\'hésitez pas si vous avez d\'autres questions.',
+        );
+      } else if (intention == 'oui') {
+        return MessageChatbot.assistant(
+          'Voulez-vous que je note un symptôme ou que je vérifie vos constantes ?',
+          quickReplies: ['Noter un symptôme', 'Vérifier constantes'],
+        );
+      } else if (intention == 'non') {
+        return MessageChatbot.assistant(
+          'D\'accord. Je reste à votre disposition si besoin.',
+        );
+      }
+    }
+
     // Réponse par défaut avec analyse NLP légère
     final analyse = _serviceNLP.extraireSymptomes(message);
     if (analyse.aSymptomes) {
@@ -146,9 +167,21 @@ class ServiceChatbot {
       );
     }
 
+    // Rotation des messages d'incompréhension pour éviter la répétition
+    final fallbacks = [
+      'Je ne suis pas sûr de comprendre. Souhaitez-vous :',
+      'Pardon, je n\'ai pas saisi. Voulez-vous :',
+      'Pourriez-vous reformuler ? Sinon, je peux :',
+    ];
+    final fallbackMessage = fallbacks[_random.nextInt(fallbacks.length)];
+
     return MessageChatbot.assistant(
-      'Je ne suis pas sûr de comprendre. Voulez-vous faire un point sur vos symptômes ?',
-      quickReplies: ['Oui, mes symptômes', 'Non, autre chose'],
+      fallbackMessage,
+      quickReplies: [
+        'Noter un symptôme',
+        'Voir mes constantes',
+        'Obtenir un conseil'
+      ],
     );
   }
 

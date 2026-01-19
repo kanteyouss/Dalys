@@ -19,11 +19,13 @@ class PageChatbot extends StatefulWidget {
   State<PageChatbot> createState() => _PageChatbotState();
 }
 
-class _PageChatbotState extends State<PageChatbot> {
+class _PageChatbotState extends State<PageChatbot>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ServiceChatbot _serviceChatbot = ServiceChatbot();
   final ServiceVocal _serviceVocal = ServiceVocal();
+  late AnimationController _pulseController;
 
   List<MessageChatbot> _messages = [];
   bool _isTyping = false;
@@ -33,8 +35,20 @@ class _PageChatbotState extends State<PageChatbot> {
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
     _initialiserChat();
     _initialiserVocal();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _initialiserChat() async {
@@ -144,15 +158,32 @@ class _PageChatbotState extends State<PageChatbot> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           children: [
             CircleAvatar(
-              backgroundColor: Colors.white24,
+              backgroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white24
+                  : Colors.blue.shade100,
               radius: 18,
-              child: Icon(Icons.smart_toy, size: 22, color: Colors.white),
+              child: Icon(
+                Icons.smart_toy,
+                size: 22,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.blue.shade700,
+              ),
             ),
-            SizedBox(width: 12),
-            Text('Assistant DALYS'),
+            const SizedBox(width: 12),
+            Text(
+              'Assistant DALYS',
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Theme.of(context).appBarTheme.foregroundColor ??
+                        Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
         actions: [
@@ -213,17 +244,33 @@ class _PageChatbotState extends State<PageChatbot> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ActionChip(
-                      label: Text(_suggestions[index],
-                          style: const TextStyle(fontSize: 13)),
+                      label: Text(
+                        _suggestions[index],
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                       onPressed: () =>
                           _envoyerReponseRapide(_suggestions[index]),
-                      backgroundColor: Colors.white,
+                      backgroundColor:
+                          Theme.of(context).brightness == Brightness.dark
+                              ? Colors.grey.shade800
+                              : Colors.blue.shade50,
                       side: BorderSide(
-                          color:
-                              Theme.of(context).primaryColor.withOpacity(0.2)),
+                        color: Theme.of(context).primaryColor.withOpacity(0.3),
+                        width: 1.5,
+                      ),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20)),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      elevation: 2,
+                      shadowColor: Colors.black.withOpacity(0.1),
                     ),
                   );
                 },
@@ -232,8 +279,24 @@ class _PageChatbotState extends State<PageChatbot> {
           Container(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              border: Border(top: BorderSide(color: Colors.grey.shade200)),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.grey.shade900
+                  : Colors.white,
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey.shade800
+                      : Colors.grey.shade300,
+                  width: 1,
+                ),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, -2),
+                ),
+              ],
             ),
             child: SafeArea(
               child: Row(
@@ -244,13 +307,35 @@ class _PageChatbotState extends State<PageChatbot> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey.shade800
+                            : Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.grey.shade700
+                              : Colors.grey.shade300,
+                          width: 1,
+                        ),
                       ),
                       child: TextField(
                         controller: _textController,
+                        style: TextStyle(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : Colors.grey.shade900,
+                          fontSize: 15,
+                        ),
                         decoration: InputDecoration(
-                          hintText: _isListening ? 'Écoute...' : 'Message...',
+                          hintText:
+                              _isListening ? '🎤 Écoute...' : 'Message...',
+                          hintStyle: TextStyle(
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade500,
+                            fontSize: 15,
+                          ),
                           border: InputBorder.none,
                           contentPadding:
                               const EdgeInsets.symmetric(vertical: 10),
@@ -277,19 +362,33 @@ class _PageChatbotState extends State<PageChatbot> {
   Widget _buildMicButton() {
     return GestureDetector(
       onTap: _basculerEcoute,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: _isListening
-              ? Colors.red.shade100
-              : Theme.of(context).primaryColor.withOpacity(0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          _isListening ? Icons.mic : Icons.mic_none,
-          color: _isListening ? Colors.red : Theme.of(context).primaryColor,
-          size: 24,
-        ),
+      child: AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          return Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _isListening
+                  ? Colors.red.shade100
+                  : Theme.of(context).primaryColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+              boxShadow: _isListening
+                  ? [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.5),
+                        blurRadius: 10 + (_pulseController.value * 10),
+                        spreadRadius: 2 + (_pulseController.value * 4),
+                      )
+                    ]
+                  : null,
+            ),
+            child: Icon(
+              _isListening ? Icons.mic : Icons.mic_none,
+              color: _isListening ? Colors.red : Theme.of(context).primaryColor,
+              size: 24,
+            ),
+          );
+        },
       ),
     );
   }

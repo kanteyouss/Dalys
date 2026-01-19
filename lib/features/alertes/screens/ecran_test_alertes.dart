@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dalys/data/models/modele_alerte.dart';
 import 'package:dalys/features/alertes/providers/alertes_provider.dart';
+import 'package:dalys/data/services/emergency_service.dart';
 
 /// Écran de test pour validation du système d'alertes
 class EcranTestAlertes extends StatefulWidget {
@@ -12,8 +13,6 @@ class EcranTestAlertes extends StatefulWidget {
 }
 
 class _EcranTestAlertesState extends State<EcranTestAlertes> {
-  int _ongletActuel = 0;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -34,6 +33,16 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
             onPressed: () => _afficherParametres(context),
             tooltip: 'Paramètres',
           ),
+          IconButton(
+            icon: const Icon(Icons.restart_alt),
+            onPressed: () {
+              EmergencyService().resetEmergencyState();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('État d\'urgence réinitialisé')),
+              );
+            },
+            tooltip: 'Réinitialiser SOS',
+          ),
         ],
       ),
       body: DefaultTabController(
@@ -41,7 +50,6 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
         child: Column(
           children: [
             TabBar(
-              onTap: (index) => setState(() => _ongletActuel = index),
               tabs: const [
                 Tab(icon: Icon(Icons.warning), text: 'Actives'),
                 Tab(icon: Icon(Icons.history), text: 'Historique'),
@@ -147,7 +155,7 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
     return Consumer<AlertesProvider>(
       builder: (context, provider, child) {
         final historique = provider.historiqueFiltre;
-        
+
         return Column(
           children: [
             // Barre de recherche et filtres
@@ -202,8 +210,7 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
     return Consumer<AlertesProvider>(
       builder: (context, provider, child) {
         final stats = provider.obtenirStatistiquesGenerales();
-        final statsHistorique = provider.statistiquesHistorique;
-        
+
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -274,9 +281,11 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
                 ),
                 const SizedBox(width: 16),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: _obtenirCouleurPriorite(alerte.niveauPriorite).withOpacity(0.2),
+                    color: _obtenirCouleurPriorite(alerte.niveauPriorite)
+                        .withOpacity(0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -331,7 +340,8 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
   }
 
   /// Construit une carte d'historique
-  Widget _construireCarteHistorique(ModeleAlerte alerte, AlertesProvider provider) {
+  Widget _construireCarteHistorique(
+      ModeleAlerte alerte, AlertesProvider provider) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 2),
       elevation: 1,
@@ -347,8 +357,8 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: alerte.statut == StatutAlerte.resolue 
-                ? Colors.grey.shade600 
+            color: alerte.statut == StatutAlerte.resolue
+                ? Colors.grey.shade600
                 : null,
           ),
         ),
@@ -383,7 +393,8 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
   }
 
   /// Construit une carte de statistique
-  Widget _construireCarteStatistique(String titre, String valeur, IconData icone, Color couleur) {
+  Widget _construireCarteStatistique(
+      String titre, String valeur, IconData icone, Color couleur) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -556,9 +567,12 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            _construireLigneConfig('Mode Simulation', config['mode_simulation'].toString()),
-            _construireLigneConfig('Intervalle MAJ', '${config['intervalle_maj']} min'),
-            _construireLigneConfig('MAJ Automatique', config['maj_automatique'].toString()),
+            _construireLigneConfig(
+                'Mode Simulation', config['mode_simulation'].toString()),
+            _construireLigneConfig(
+                'Intervalle MAJ', '${config['intervalle_maj']} min'),
+            _construireLigneConfig(
+                'MAJ Automatique', config['maj_automatique'].toString()),
           ],
         ),
       ),
@@ -667,11 +681,13 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
               Text('Statut: ${alerte.statut.libelle}'),
               Text('Date: ${_formaterDate(alerte.dateCreation)}'),
               const SizedBox(height: 12),
-              const Text('Description:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Description:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               Text(alerte.description),
               if (alerte.recommandations.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                const Text('Recommandations:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Recommandations:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 ...alerte.recommandations.map((rec) => Text('• $rec')),
               ],
               if (alerte.source.isNotEmpty) ...[
@@ -694,7 +710,7 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
   /// Lance un test complet du système
   void _testerSysteme(BuildContext context) async {
     final provider = context.read<AlertesProvider>();
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -710,16 +726,16 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
         ),
       ),
     );
-    
+
     try {
       // Test de connectivité
       final connectivite = await provider.testerConnectiviteServices();
-      
+
       // Force une mise à jour
       await provider.forcerMiseAJour();
-      
+
       Navigator.of(context).pop(); // Fermer le dialog de chargement
-      
+
       // Afficher les résultats
       showDialog(
         context: context,
@@ -730,8 +746,10 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('IA: ${connectivite['ia']! ? '✅' : '❌'}'),
-              Text('Environnemental: ${connectivite['environnemental']! ? '✅' : '❌'}'),
-              Text('Notifications: ${connectivite['notifications']! ? '✅' : '❌'}'),
+              Text(
+                  'Environnemental: ${connectivite['environnemental']! ? '✅' : '❌'}'),
+              Text(
+                  'Notifications: ${connectivite['notifications']! ? '✅' : '❌'}'),
               const SizedBox(height: 12),
               Text('Alertes générées: ${provider.alertesActives.length}'),
             ],
@@ -744,10 +762,9 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
           ],
         ),
       );
-      
     } catch (erreur) {
       Navigator.of(context).pop(); // Fermer le dialog de chargement
-      
+
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -775,18 +792,23 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
 
   Color _obtenirCouleurNomPriorite(String nom) {
     switch (nom) {
-      case 'critique': return Colors.red;
-      case 'elevee': return Colors.orange;
-      case 'moyenne': return Colors.yellow.shade700;
-      case 'faible': return Colors.green;
-      default: return Colors.grey;
+      case 'critique':
+        return Colors.red;
+      case 'elevee':
+        return Colors.orange;
+      case 'moyenne':
+        return Colors.yellow.shade700;
+      case 'faible':
+        return Colors.green;
+      default:
+        return Colors.grey;
     }
   }
 
   String _formaterDuree(DateTime date) {
     final maintenant = DateTime.now();
     final difference = maintenant.difference(date);
-    
+
     if (difference.inMinutes < 60) {
       return 'Il y a ${difference.inMinutes}min';
     } else if (difference.inHours < 24) {
@@ -798,9 +820,9 @@ class _EcranTestAlertesState extends State<EcranTestAlertes> {
 
   String _formaterDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/'
-           '${date.month.toString().padLeft(2, '0')}/'
-           '${date.year} à '
-           '${date.hour.toString().padLeft(2, '0')}:'
-           '${date.minute.toString().padLeft(2, '0')}';
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year} à '
+        '${date.hour.toString().padLeft(2, '0')}:'
+        '${date.minute.toString().padLeft(2, '0')}';
   }
 }

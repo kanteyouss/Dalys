@@ -15,7 +15,8 @@ class MessageBubble extends StatefulWidget {
   State<MessageBubble> createState() => _MessageBubbleState();
 }
 
-class _MessageBubbleState extends State<MessageBubble> with SingleTickerProviderStateMixin {
+class _MessageBubbleState extends State<MessageBubble>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _opacity;
   late Animation<Offset> _slide;
@@ -30,7 +31,8 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
     _opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
-    _slide = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+    _slide =
+        Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOutQuad),
     );
     _controller.forward();
@@ -54,13 +56,15 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(
-            mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            mainAxisAlignment:
+                isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!isUser) ...[
                 CircleAvatar(
                   radius: 16,
-                  backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                  backgroundColor:
+                      Theme.of(context).primaryColor.withOpacity(0.1),
                   child: Icon(
                     Icons.medical_services,
                     size: 18,
@@ -71,22 +75,29 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
               ],
               Flexible(
                 child: Column(
-                  crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  crossAxisAlignment: isUser
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
                         color: isUser
                             ? Theme.of(context).primaryColor
-                            : (Theme.of(context).brightness == Brightness.dark 
-                                ? Colors.grey.shade800 
-                                : Colors.grey.shade200),
+                            : (Theme.of(context).brightness == Brightness.dark
+                                ? Colors.grey.shade800
+                                : Colors.grey.shade100),
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(20),
                           topRight: const Radius.circular(20),
                           bottomLeft: Radius.circular(isUser ? 20 : 4),
                           bottomRight: Radius.circular(isUser ? 4 : 20),
                         ),
+                        border: !isUser &&
+                                Theme.of(context).brightness == Brightness.light
+                            ? Border.all(color: Colors.grey.shade300, width: 1)
+                            : null,
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.05),
@@ -98,12 +109,13 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
                       child: Text(
                         widget.message.text,
                         style: TextStyle(
-                          color: isUser 
-                              ? Colors.white 
-                              : (Theme.of(context).brightness == Brightness.dark 
-                                  ? Colors.white 
-                                  : Colors.black87),
+                          color: isUser
+                              ? Colors.white
+                              : (Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white
+                                  : Colors.grey.shade900),
                           fontSize: 15,
+                          height: 1.4,
                         ),
                       ),
                     ),
@@ -112,25 +124,29 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
                       timeFormat.format(widget.message.timestamp),
                       style: TextStyle(
                         fontSize: 11,
-                        color: Theme.of(context).brightness == Brightness.dark 
-                            ? Colors.grey.shade400 
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey.shade300
                             : Colors.grey.shade600,
                       ),
                     ),
                     // Carte de santé si présente
-                    if (widget.message.type == MessageType.healthCard && widget.message.healthData != null) ...[
+                    if (widget.message.type == MessageType.healthCard &&
+                        widget.message.healthData != null) ...[
                       const SizedBox(height: 8),
                       _HealthCardWidget(data: widget.message.healthData),
                     ],
 
                     // Carte de diagnostic si présente
-                    if (widget.message.type == MessageType.diagnosticCard && widget.message.diagnosticData != null) ...[
+                    if (widget.message.type == MessageType.diagnosticCard &&
+                        widget.message.diagnosticData != null) ...[
                       const SizedBox(height: 8),
-                      _DiagnosticCardWidget(data: widget.message.diagnosticData!),
+                      _DiagnosticCardWidget(
+                          data: widget.message.diagnosticData!),
                     ],
-                    
+
                     // Quick replies si présentes
-                    if (widget.message.quickReplies != null && widget.message.quickReplies!.isNotEmpty) ...[
+                    if (widget.message.quickReplies != null &&
+                        widget.message.quickReplies!.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
@@ -174,15 +190,21 @@ class _HealthCardWidget extends StatelessWidget {
     // On suppose que data est de type HealthData
     // Idéalement on devrait typer fortement, mais pour l'instant on reste dynamique
     // pour éviter les dépendances circulaires trop complexes si HealthData n'est pas dispo ici
-    
+
     return Container(
-      width: 240,
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.75,
+      ),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.grey.shade800
+            : Colors.white,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).primaryColor.withOpacity(0.2),
+          color: Theme.of(context).brightness == Brightness.light
+              ? Colors.grey.shade300
+              : Theme.of(context).primaryColor.withOpacity(0.2),
         ),
         boxShadow: [
           BoxShadow(
@@ -197,7 +219,8 @@ class _HealthCardWidget extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.monitor_heart, size: 20, color: Theme.of(context).primaryColor),
+              Icon(Icons.monitor_heart,
+                  size: 20, color: Theme.of(context).primaryColor),
               const SizedBox(width: 8),
               Text(
                 'Signes Vitaux',
@@ -237,7 +260,8 @@ class _HealthCardWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildMetricRow(BuildContext context, {
+  Widget _buildMetricRow(
+    BuildContext context, {
     required IconData icon,
     required String label,
     required String value,
@@ -257,16 +281,21 @@ class _HealthCardWidget extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            color: Theme.of(context).textTheme.bodySmall?.color,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey.shade300
+                : Colors.grey.shade700,
             fontSize: 13,
           ),
         ),
         const Spacer(),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.grey.shade900,
           ),
         ),
       ],
@@ -310,7 +339,9 @@ class _DiagnosticCardWidget extends StatelessWidget {
     }
 
     return Container(
-      width: 260,
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.75,
+      ),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -350,7 +381,7 @@ class _DiagnosticCardWidget extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Contenu
           Padding(
             padding: const EdgeInsets.all(16),
@@ -368,7 +399,12 @@ class _DiagnosticCardWidget extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   summary,
-                  style: const TextStyle(fontSize: 14),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade300
+                        : Colors.grey.shade800,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -381,21 +417,27 @@ class _DiagnosticCardWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 ...recommendations.map((rec) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.arrow_right, size: 18, color: riskColor),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          rec,
-                          style: const TextStyle(fontSize: 13),
-                        ),
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.arrow_right, size: 18, color: riskColor),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              rec,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.grey.shade300
+                                    : Colors.grey.shade800,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                )),
+                    )),
               ],
             ),
           ),

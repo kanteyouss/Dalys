@@ -32,6 +32,8 @@ class HealthDashboard extends StatefulWidget {
 class _HealthDashboardState extends State<HealthDashboard> {
   List<Suggestion> _suggestions = [];
   bool _isLoadingScore = false;
+  final ExpansionTileController _expansionController =
+      ExpansionTileController();
 
   // 🔮 NOUVEAUX ÉTATS POUR LES PRÉVISIONS AVANCÉES
   ComprehensiveHealthForecast? _comprehensiveForecast;
@@ -93,6 +95,17 @@ class _HealthDashboardState extends State<HealthDashboard> {
           _isLoadingScore = false;
           _isLoadingForecast = false;
         });
+
+        // Auto-expansion si risque élevé ou nouveaux conseils
+        final controller = context.read<HealthController>();
+        if (controller.currentHealthData?.riskLevel == RiskLevel.high ||
+            suggestions.isNotEmpty) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted && !_expansionController.isExpanded) {
+              _expansionController.expand();
+            }
+          });
+        }
       }
     }
   }
@@ -253,7 +266,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
 
           final isHighRisk = currentData.riskLevel == RiskLevel.high;
           final backgroundColor = isHighRisk
-              ? Colors.red.shade50.withOpacity(0.5)
+              ? Colors.red.shade50.withValues(alpha: 0.5)
               : Colors.transparent;
 
           return DefaultTabController(
@@ -272,14 +285,28 @@ class _HealthDashboardState extends State<HealthDashboard> {
                     margin:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: TabBar(
-                      tabs: const [
-                        Tab(text: 'Aujourd\'hui', icon: Icon(Icons.today)),
-                        Tab(text: 'Prévisions', icon: Icon(Icons.psychology)),
-                        Tab(text: 'Outils', icon: Icon(Icons.build)),
+                      tabs: [
+                        const Tab(
+                            text: 'Aujourd\'hui', icon: Icon(Icons.today)),
+                        const Tab(
+                            text: 'Prévisions', icon: Icon(Icons.psychology)),
+                        Tab(
+                          child: Badge(
+                            isLabelVisible: _suggestions.isNotEmpty,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.build),
+                                SizedBox(width: 8),
+                                Text('Outils'),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                       labelColor: Theme.of(context).primaryColor,
                       unselectedLabelColor: Colors.grey,
@@ -390,13 +417,13 @@ class _HealthDashboardState extends State<HealthDashboard> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: isSim
-            ? Colors.orange.withOpacity(0.1)
-            : Colors.green.withOpacity(0.1),
+            ? Colors.orange.withValues(alpha: 0.1)
+            : Colors.green.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isSim
-              ? Colors.orange.withOpacity(0.3)
-              : Colors.green.withOpacity(0.3),
+              ? Colors.orange.withValues(alpha: 0.3)
+              : Colors.green.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -455,8 +482,8 @@ class _HealthDashboardState extends State<HealthDashboard> {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: isSim
-                            ? Colors.orange.withOpacity(0.1)
-                            : theme.primaryColor.withOpacity(0.1),
+                            ? Colors.orange.withValues(alpha: 0.1)
+                            : theme.primaryColor.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -501,7 +528,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
                           );
                         }
                       },
-                      activeColor: theme.primaryColor,
+                      activeThumbColor: theme.primaryColor,
                     ),
                   ],
                 ),
@@ -543,12 +570,16 @@ class _HealthDashboardState extends State<HealthDashboard> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+            ),
           ),
         ),
         if (onInfo != null)
@@ -562,20 +593,39 @@ class _HealthDashboardState extends State<HealthDashboard> {
   }
 
   Widget _buildContextSection(BuildContext context, HealthData currentData) {
+    final isCritical = currentData.riskLevel == RiskLevel.high ||
+        _suggestions.any((s) => s.type == TypeSuggestion.alert);
+
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: isCritical ? 4 : 2,
+      shadowColor: isCritical ? Colors.red.withValues(alpha: 0.2) : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: isCritical
+            ? BorderSide(color: Colors.red.shade200, width: 1)
+            : BorderSide.none,
+      ),
       child: ExpansionTile(
-        leading: Icon(Icons.info_outline, color: Colors.blue.shade600),
-        title: const Text(
+        controller: _expansionController,
+        leading: Icon(
+            isCritical ? Icons.warning_amber_rounded : Icons.info_outline,
+            color: isCritical ? Colors.red.shade600 : Colors.blue.shade600),
+        title: Text(
           'Contexte & Conseils',
-          style: TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isCritical ? Colors.red.shade800 : Colors.black87,
+          ),
         ),
         subtitle: Text(
           _suggestions.isNotEmpty
               ? '${_suggestions.length} conseil(s) disponible(s)'
               : 'Tout est normal',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+          style: TextStyle(
+            fontSize: 13,
+            color: isCritical ? Colors.red.shade600 : Colors.grey.shade600,
+            fontWeight: isCritical ? FontWeight.w500 : FontWeight.normal,
+          ),
         ),
         children: [
           Padding(
@@ -653,7 +703,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.red.withOpacity(0.3),
+                  color: Colors.red.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -704,7 +754,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
             borderRadius: BorderRadius.circular(isHighRisk ? 24 : 16),
             boxShadow: [
               BoxShadow(
-                  color: Colors.red.withOpacity(0.3),
+                  color: Colors.red.withValues(alpha: 0.3),
                   blurRadius: 12,
                   offset: const Offset(0, 6)),
             ],
@@ -731,7 +781,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
                       Text(
                         'Appuyez pour déclencher le protocole',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                           fontSize: 16,
                         ),
                       ),
@@ -739,7 +789,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
                       Text(
                         'Alerte immédiate aux proches',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                           fontSize: 13,
                         ),
                       ),
@@ -825,8 +875,9 @@ class _HealthDashboardState extends State<HealthDashboard> {
 
   Widget _buildEnvironmentalSection(
       BuildContext context, HealthData currentData) {
-    if (currentData.temperature == null && currentData.humidity == null)
+    if (currentData.temperature == null && currentData.humidity == null) {
       return const SizedBox.shrink();
+    }
 
     return Card(
       elevation: 2,
@@ -883,12 +934,19 @@ class _HealthDashboardState extends State<HealthDashboard> {
         Row(
           children: [
             Expanded(
-              child: _buildActionButton(
-                context,
-                'Conseils',
-                Icons.lightbulb_outline,
-                () => Navigator.pushNamed(context, '/suggestions'),
-                isPrimary: false,
+              child: Badge(
+                isLabelVisible: _suggestions.isNotEmpty,
+                label: Text(_suggestions.length.toString()),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: _buildActionButton(
+                    context,
+                    'Conseils',
+                    Icons.lightbulb_outline,
+                    () => Navigator.pushNamed(context, '/suggestions'),
+                    isPrimary: false,
+                  ),
+                ),
               ),
             ),
           ],
@@ -916,7 +974,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
         const SizedBox(height: 12),
         Card(
           elevation: 4,
-          shadowColor: Colors.blue.withOpacity(0.2),
+          shadowColor: Colors.blue.withValues(alpha: 0.2),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: InkWell(
@@ -937,7 +995,7 @@ class _HealthDashboardState extends State<HealthDashboard> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.spa, color: Colors.blue, size: 32),
@@ -1123,12 +1181,16 @@ class _HealthDashboardState extends State<HealthDashboard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Prévisions IA Avancées',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Prévisions IA Avancées',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                        ),
                       ),
                       Text(
                         _isLoadingForecast

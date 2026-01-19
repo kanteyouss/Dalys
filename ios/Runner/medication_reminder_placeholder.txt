@@ -1,0 +1,40 @@
+# PLACEHOLDER - Fichier son iOS
+
+Ce fichier est un placeholder. Remplacez-le par:
+
+**Nom du fichier:** medication_reminder.aiff
+
+**Caractéristiques recommandées:**
+- Format: AIFF ou M4A (CAF aussi supporté)
+- Durée: 2-3 secondes
+- Sample rate: 44.1 kHz ou 48 kHz
+- Type: Son doux, carillon apaisant
+- Volume: Modéré
+
+**Conversion MP3 → AIFF:**
+
+1. **Avec FFmpeg (ligne de commande):**
+   ```bash
+   ffmpeg -i medication_reminder.mp3 -acodec pcm_s16le medication_reminder.aiff
+   ```
+
+2. **Avec iTunes/Music (Mac):**
+   - Importer le MP3
+   - Clic droit > Créer une version AIFF
+   - Renommer en medication_reminder.aiff
+
+3. **Avec Audacity:**
+   - Ouvrir le MP3
+   - Fichier > Exporter > Exporter comme AIFF
+   - Nommer: medication_reminder.aiff
+
+**Instructions d'installation:**
+1. Créer/convertir votre fichier son en AIFF
+2. Le renommer en: medication_reminder.aiff
+3. Ouvrir ios/Runner.xcworkspace dans Xcode
+4. Glisser-déposer le fichier dans Runner > Runner (dossier)
+5. Cocher "Copy items if needed"
+6. Vérifier qu'il apparaît dans Build Phases > Copy Bundle Resources
+7. Supprimer ce fichier placeholder
+
+**IMPORTANT:** Le nom DOIT être exactement "medication_reminder.aiff" (minuscules, underscores)

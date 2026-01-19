@@ -199,7 +199,7 @@ class PredictiveAlertEngine {
         ]);
       }
 
-      // Actions spécifiques aux patterns détectés
+      // Actions spécifiques aux habitudes détectées
       if (!longTermAnalysis.hasInsufficientData) {
         final tomorrow = DateTime.now().add(Duration(days: 1));
         final tomorrowWeekday = tomorrow.weekday;
@@ -276,7 +276,8 @@ class PredictiveAlertEngine {
             severity: AlertSeverity.medium,
             timeHorizon: '${cycle.lengthDays} jours',
             title: 'Cycle défavorable prévu',
-            message: 'Pattern récurrent de ${cycle.lengthDays} jours détecté',
+            message:
+                'Habitude récurrente de ${cycle.lengthDays} jours détectée',
             confidence: cycle.similarity,
             preventiveActions: [
               'Préparer stratégie spécifique',
@@ -303,13 +304,13 @@ class PredictiveAlertEngine {
   ) {
     final recommendations = <StrategicRecommendation>[];
 
-    // Stratégie basée sur les patterns hebdomadaires
+    // Stratégie basée sur les habitudes hebdomadaires
     if (!longTermAnalysis.hasInsufficientData) {
       final weeklyPattern = longTermAnalysis.weeklyPatterns;
 
       recommendations.add(StrategicRecommendation(
         category: 'Optimisation hebdomadaire',
-        title: 'Adapter votre routine aux patterns détectés',
+        title: 'Adapter votre routine aux habitudes détectées',
         description: 'Votre meilleur jour: ${weeklyPattern.bestDayName}, '
             'votre jour le plus difficile: ${weeklyPattern.worstDayName}',
         actions: [
@@ -321,12 +322,12 @@ class PredictiveAlertEngine {
         isBestLever: weeklyPattern.worstDay == DateTime.now().weekday,
       ));
 
-      // Stratégie basée sur les corrélations
+      // Stratégie basée sur les liens directs
       final correlations = longTermAnalysis.extendedCorrelations;
       if (correlations.spo2BreathingCorr.abs() > 0.6) {
         recommendations.add(StrategicRecommendation(
           category: 'Exercices ciblés',
-          title: 'Forte corrélation SpO₂-Respiration détectée',
+          title: 'Lien direct SpO₂-Respiration détecté',
           description:
               'Vos paramètres sont ${correlations.spo2BreathingCorr > 0 ? "positivement" : "négativement"} liés',
           actions: [
@@ -335,7 +336,7 @@ class PredictiveAlertEngine {
             'Techniques de respiration lors de stress',
           ],
           evidence:
-              'Corrélation: ${correlations.spo2BreathingCorr.toStringAsFixed(2)}',
+              'Analyse de lien: ${correlations.spo2BreathingCorr.toStringAsFixed(2)}',
           isBestLever:
               true, // La stabilisation respiratoire est souvent le meilleur levier
         ));

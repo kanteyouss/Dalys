@@ -7,13 +7,11 @@ import 'trend_analysis_service.dart';
 import 'fragility_score_service.dart';
 import 'predictive_alert_engine.dart';
 import 'database_service.dart';
-import '../models/fragility_models.dart';
 
 /// Service de prévisions avancées exploitant TOUTES les données historiques
 /// Orchestrateur principal pour l'analyse prédictive complète
 class HealthForecastService {
-  static final HealthForecastService _instance =
-      HealthForecastService._internal();
+  static final HealthForecastService _instance = HealthForecastService._internal();
   factory HealthForecastService() => _instance;
   HealthForecastService._internal();
 
@@ -24,11 +22,10 @@ class HealthForecastService {
 
   /// Génère une prévision complète exploitant TOUT l'historique utilisateur
   /// Utilise les 80+ mesures disponibles pour des insights approfondis
-  Future<ComprehensiveHealthForecast> generateComprehensiveForecast(
-      int userId) async {
+  Future<ComprehensiveHealthForecast> generateComprehensiveForecast(int userId) async {
     // 1️⃣ Récupérer TOUT l'historique de l'utilisateur
     final fullHistory = await _getCompleteUserHistory(userId);
-
+    
     if (fullHistory.isEmpty) {
       return ComprehensiveHealthForecast.empty();
     }
@@ -37,12 +34,10 @@ class HealthForecastService {
     final profile = await _getOrCreatePatientProfile(userId);
 
     // 3️⃣ Analyse long-terme avec tout l'historique
-    final longTermAnalysis =
-        await _trendService.analyzeLongTermTrends(fullHistory);
+    final longTermAnalysis = await _trendService.analyzeLongTermTrends(fullHistory);
 
     // 4️⃣ Prévisions de fragilité multi-horizon
-    final fragilityForecast =
-        await _fragilityService.calculateFragilityForecast(
+    final fragilityForecast = await _fragilityService.calculateFragilityForecast(
       fullHistory,
       profile,
     );
@@ -65,26 +60,15 @@ class HealthForecastService {
       fullHistory,
       fragilityForecast,
       longTermAnalysis,
-      profile,
     );
-
-    // 8️⃣ Extraire les insights haute-impact
-    final primaryTrigger =
-        _extractPrimaryTrigger(longTermAnalysis, fragilityForecast);
-    final actionWindow = _calculateActionWindow(fragilityForecast);
-    final confidenceReason =
-        _generateConfidenceReason(fullHistory, longTermAnalysis);
-    final personalNormComparison =
-        _generatePersonalNormComparison(fullHistory, profile);
 
     return ComprehensiveHealthForecast(
       userId: userId,
       dataPoints: fullHistory.length,
       timeSpan: _calculateTimeSpan(fullHistory),
-      primaryTrigger: primaryTrigger,
-      actionWindow: actionWindow,
-      confidenceReason: confidenceReason,
-      personalNormComparison: personalNormComparison,
+      primaryTrigger: _identifyPrimaryTrigger(longTermAnalysis, fragilityForecast),
+      confidenceReason: _buildConfidenceReason(fullHistory, longTermAnalysis),
+      personalNormComparison: _buildPersonalNormComparison(longTermAnalysis),
       longTermAnalysis: longTermAnalysis,
       fragilityForecast: fragilityForecast,
       multiHorizonAlerts: multiHorizonAlerts,
@@ -92,15 +76,14 @@ class HealthForecastService {
       globalHealthScore: healthScore,
       confidence: _calculateOverallConfidence(fullHistory, longTermAnalysis),
       generatedAt: DateTime.now(),
-      validUntil:
-          DateTime.now().add(Duration(hours: 6)), // Mise à jour toutes les 6h
+      validUntil: DateTime.now().add(Duration(hours: 6)), // Mise à jour toutes les 6h
     );
   }
 
   /// Récupère TOUT l'historique utilisateur (pas de limite temporelle)
   Future<List<HealthData>> _getCompleteUserHistory(int userId) async {
     final db = await _dbService.database;
-
+    
     final results = await db.query(
       'health_data',
       where: 'user_id = ?',
@@ -109,22 +92,20 @@ class HealthForecastService {
       // Pas de limite - on veut TOUTES les données
     );
 
-    return results
-        .map((row) => HealthData.fromJson({
-              'user_id': row['user_id'],
-              'date': row['date'],
-              'spo2': row['spo2'],
-              'breathing_rate': row['breathing_rate'],
-              'pef': row['pef'],
-              'temperature': row['temperature'],
-              'humidity': row['humidity'],
-              'env_temperature': row['env_temperature'],
-              'symptoms': (row['symptoms'] as String?)?.isEmpty ?? true
-                  ? <String>[]
-                  : (row['symptoms'] as String).split(','),
-              'risk_level': row['risk_level'],
-            }))
-        .toList();
+    return results.map((row) => HealthData.fromJson({
+      'user_id': row['user_id'],
+      'date': row['date'],
+      'spo2': row['spo2'],
+      'breathing_rate': row['breathing_rate'],
+      'pef': row['pef'],
+      'temperature': row['temperature'],
+      'humidity': row['humidity'],
+      'env_temperature': row['env_temperature'],
+      'symptoms': (row['symptoms'] as String?)?.isEmpty ?? true
+          ? <String>[]
+          : (row['symptoms'] as String).split(','),
+      'risk_level': row['risk_level'],
+    })).toList();
   }
 
   /// Récupère ou crée le profil patient
@@ -160,11 +141,10 @@ class HealthForecastService {
     insights.add(HealthInsight(
       category: 'Données',
       title: 'Richesse de votre historique',
-      description:
-          'Vous avez ${fullHistory.length} mesures sur ${_calculateTimeSpan(fullHistory)}',
+      description: 'Vous avez ${fullHistory.length} mesures sur ${_calculateTimeSpan(fullHistory)}',
       significance: _calculateDataRichness(fullHistory),
       actionable: fullHistory.length < 30,
-      action: fullHistory.length < 30
+      action: fullHistory.length < 30 
           ? 'Continuez vos mesures régulières pour des prédictions plus précises'
           : null,
     ));
@@ -172,19 +152,15 @@ class HealthForecastService {
     // 📈 Insights sur les tendances long-terme
     if (!longTermAnalysis.hasInsufficientData) {
       final trends = longTermAnalysis.longTermTrends;
-
+      
       if (trends.spo2Trend.abs() > 0.5) {
         insights.add(HealthInsight(
           category: 'Évolution',
-          title: trends.spo2Trend > 0
-              ? 'Amélioration détectée'
-              : 'Vigilance recommandée',
-          description: trends.spo2Trend > 0
-              ? 'Votre taux d\'oxygène montre une tendance à l\'amélioration.'
-              : 'Une légère baisse progressive de votre oxygène a été détectée.',
+          title: trends.spo2Trend > 0 ? 'Amélioration détectée' : 'Déclin détecté',
+          description: 'SpO₂ ${trends.spo2Trend > 0 ? "s'améliore" : "décline"} de ${trends.spo2Trend.abs().toStringAsFixed(1)}%/semaine',
           significance: trends.trendStrength,
           actionable: trends.spo2Trend < 0,
-          action: trends.spo2Trend < 0
+          action: trends.spo2Trend < 0 
               ? 'Discuter de cette tendance avec votre médecin'
               : null,
         ));
@@ -195,15 +171,14 @@ class HealthForecastService {
       if (weeklyPattern.spo2ByDay.isNotEmpty) {
         final bestDay = weeklyPattern.bestDayName;
         final worstDay = weeklyPattern.worstDayName;
-
+        
         insights.add(HealthInsight(
           category: 'Patterns',
           title: 'Votre rythme hebdomadaire',
           description: 'Meilleur jour: $bestDay, Plus difficile: $worstDay',
           significance: 0.7,
           actionable: true,
-          action:
-              'Planifiez activités importantes les $bestDay, repos les $worstDay',
+          action: 'Planifiez activités importantes les $bestDay, repos les $worstDay',
         ));
       }
 
@@ -213,12 +188,10 @@ class HealthForecastService {
         insights.add(HealthInsight(
           category: 'Corrélations',
           title: 'Lien SpO₂-Respiration fort',
-          description:
-              'Vos paramètres sont ${correlations.spo2BreathingCorr > 0 ? "très" : "inversement"} liés',
+          description: 'Vos paramètres sont ${correlations.spo2BreathingCorr > 0 ? "très" : "inversement"} liés',
           significance: correlations.spo2BreathingCorr.abs(),
           actionable: true,
-          action:
-              'Les exercices respiratoires auront un impact direct sur votre SpO₂',
+          action: 'Les exercices respiratoires auront un impact direct sur votre SpO₂',
         ));
       }
     }
@@ -228,13 +201,10 @@ class HealthForecastService {
       insights.add(HealthInsight(
         category: 'Prévision',
         title: 'Prédiction 7 jours fiable',
-        description:
-            'Confiance ${fragilityForecast.prediction7Days.confidenceDescription} dans nos prédictions',
+        description: 'Confiance ${fragilityForecast.prediction7Days.confidenceDescription} dans nos prédictions',
         significance: fragilityForecast.prediction7Days.confidence,
-        actionable: fragilityForecast.prediction7Days.predictedLevel !=
-            fragilityForecast.currentScore.level,
-        action: fragilityForecast.prediction7Days.predictedLevel !=
-                fragilityForecast.currentScore.level
+        actionable: fragilityForecast.prediction7Days.predictedLevel != fragilityForecast.currentScore.level,
+        action: fragilityForecast.prediction7Days.predictedLevel != fragilityForecast.currentScore.level
             ? 'Suivre les recommandations préventives'
             : null,
       ));
@@ -252,7 +222,6 @@ class HealthForecastService {
     List<HealthData> fullHistory,
     FragilityForecast fragilityForecast,
     LongTermTrendAnalysis longTermAnalysis,
-    PatientRiskProfile profile,
   ) {
     double score = 50; // Baseline neutre
 
@@ -275,138 +244,53 @@ class HealthForecastService {
     }
 
     // 4️⃣ Impact du pronostic (prédictions favorables = bonus)
-    final avgPrediction = (fragilityForecast.prediction6Hours.predictedScore +
-            fragilityForecast.prediction24Hours.predictedScore +
-            fragilityForecast.prediction7Days.predictedScore) /
-        3;
+    final avgPrediction = (
+      fragilityForecast.prediction6Hours.predictedScore +
+      fragilityForecast.prediction24Hours.predictedScore +
+      fragilityForecast.prediction7Days.predictedScore
+    ) / 3;
     score += (100 - avgPrediction.toDouble()) * 0.2; // 20% du poids
 
     final double finalScore = score.clamp(0.0, 100.0).toDouble();
-
-    // 5️⃣ Comparaison avec la norme personnelle
-    String? baselineComparison;
-    if (fullHistory.isNotEmpty) {
-      final last = fullHistory.last;
-      final diffSpo2 = last.spo2 - profile.baselineSpo2;
-      if (diffSpo2.abs() > 2) {
-        baselineComparison =
-            'Votre SpO₂ habituel est de ${profile.baselineSpo2}%. Actuellement : ${last.spo2}%.';
-      }
-    }
 
     return GlobalHealthScore(
       value: finalScore,
       level: _getHealthScoreLevel(finalScore),
       components: {
         'Fragilité actuelle': fragilityForecast.currentScore.value,
-        'Tendance long-terme': longTermAnalysis.hasInsufficientData
-            ? null
-            : longTermAnalysis.longTermTrends.spo2Trend * 10 + 50,
-        'Stabilité récente':
-            fullHistory.length > 7 ? _calculateStability(fullHistory) : null,
+        'Tendance long-terme': longTermAnalysis.hasInsufficientData ? null : longTermAnalysis.longTermTrends.spo2Trend * 10 + 50,
+        'Stabilité récente': fullHistory.length > 7 ? _calculateStability(fullHistory) : null,
         'Pronostic': avgPrediction,
       },
       interpretation: _getScoreInterpretation(finalScore),
-      baselineComparison: baselineComparison,
     );
-  }
-
-  // NOUVELLES MÉTHODES POUR INSIGHTS HAUTE-IMPACT
-
-  String _extractPrimaryTrigger(
-      LongTermTrendAnalysis analysis, FragilityForecast forecast) {
-    if (analysis.hasInsufficientData) return 'Données en cours de collecte';
-
-    final trends = analysis.longTermTrends;
-    if (trends.spo2Trend < -0.5) {
-      return 'Baisse progressive de votre taux d\'oxygène (SpO₂)';
-    }
-    if (trends.breathingTrend > 0.5) {
-      return 'Augmentation de votre fréquence respiratoire habituelle';
-    }
-    if (trends.pefTrend < -10) {
-      return 'Diminution de votre capacité de souffle (PEF)';
-    }
-
-    final factors = forecast.currentScore.factors;
-    if (factors.isNotEmpty) {
-      return factors.first.name;
-    }
-
-    return 'Stabilité globale de vos paramètres';
-  }
-
-  Duration? _calculateActionWindow(FragilityForecast forecast) {
-    // Si risque élevé ou critique prévu dans 6h ou 24h
-    if (forecast.prediction6Hours.predictedLevel.index >=
-        FragilityLevel.moderate.index) {
-      return const Duration(hours: 4); // Fenêtre de sécurité standard
-    }
-    if (forecast.prediction24Hours.predictedLevel.index >=
-        FragilityLevel.elevated.index) {
-      return const Duration(hours: 12);
-    }
-    return null;
-  }
-
-  String _generateConfidenceReason(
-      List<HealthData> history, LongTermTrendAnalysis analysis) {
-    if (history.length < 10) return 'Basée sur vos premières mesures';
-    if (analysis.hasInsufficientData)
-      return 'Analyse en cours de fiabilisation';
-
-    final days = _calculateTimeSpan(history).inDays;
-    if (days >= 7) {
-      return 'Basée sur 7 jours de mesures cohérentes';
-    }
-    return 'Basée sur votre historique récent (${history.length} mesures)';
-  }
-
-  String _generatePersonalNormComparison(
-      List<HealthData> history, PatientRiskProfile profile) {
-    if (history.isEmpty) return 'Profil en cours de création';
-
-    final last = history.last;
-    final diffSpo2 = last.spo2 - profile.baselineSpo2;
-
-    if (diffSpo2 > 0)
-      return 'Vos paramètres sont au-dessus de votre moyenne habituelle';
-    if (diffSpo2 < -3)
-      return 'Légère déviation par rapport à votre norme personnelle';
-
-    return 'Vos paramètres sont conformes à votre profil habituel';
   }
 
   // MÉTHODES UTILITAIRES
 
   Duration _calculateTimeSpan(List<HealthData> history) {
-    if (history.isEmpty) {
-      return const Duration(milliseconds: 0);
-    }
+    if (history.isEmpty) return const Duration(milliseconds: 0);
     return history.last.date.difference(history.first.date);
   }
 
-  double _calculateOverallConfidence(
-      List<HealthData> history, LongTermTrendAnalysis analysis) {
+  double _calculateOverallConfidence(List<HealthData> history, LongTermTrendAnalysis analysis) {
     if (history.isEmpty) return 0.0;
-
-    final dataFactor =
-        (history.length / 50.0).clamp(0.0, 1.0); // Optimal à 50+ points
-    final timeFactor = (_calculateTimeSpan(history).inDays / 30.0)
-        .clamp(0.0, 1.0); // Optimal à 30+ jours
+    
+    final dataFactor = (history.length / 50.0).clamp(0.0, 1.0); // Optimal à 50+ points
+    final timeFactor = (_calculateTimeSpan(history).inDays / 30.0).clamp(0.0, 1.0); // Optimal à 30+ jours
     final analysisFactor = analysis.hasInsufficientData ? 0.2 : 0.8;
-
+    
     return (dataFactor + timeFactor + analysisFactor) / 3.0;
   }
 
   double _calculateDataRichness(List<HealthData> history) {
     if (history.isEmpty) return 0.0;
-
+    
     final points = history.length;
     final timeSpan = _calculateTimeSpan(history).inDays;
-
+    
     if (timeSpan == 0) return points > 10 ? 0.8 : 0.3;
-
+    
     final density = points / timeSpan; // Mesures par jour
     return (density / 5.0).clamp(0.0, 1.0); // Optimal à 5+ mesures/jour
   }
@@ -418,32 +302,28 @@ class HealthForecastService {
 
   double _calculateDataQuality(List<HealthData> history) {
     if (history.isEmpty) return 0.0;
-
+    
     // Vérifier la consistance et la complétude
-    final completeEntries = history
-        .where((d) => d.spo2 > 0 && d.breathingRate > 0 && d.pef > 0)
-        .length;
-
+    final completeEntries = history.where((d) => 
+        d.spo2 > 0 && d.breathingRate > 0 && d.pef > 0).length;
+    
     return completeEntries / history.length;
   }
 
   double _calculateVariance(List<double> values) {
     if (values.length < 2) return 0.0;
-
+    
     final mean = values.reduce((a, b) => a + b) / values.length;
-    final sumSquaredDiffs =
-        values.map((v) => (v - mean) * (v - mean)).reduce((a, b) => a + b);
+    final sumSquaredDiffs = values.map((v) => (v - mean) * (v - mean)).reduce((a, b) => a + b);
     return sumSquaredDiffs / (values.length - 1);
   }
 
   double _calculateStability(List<HealthData> history) {
-    final recent =
-        history.length > 7 ? history.sublist(history.length - 7) : history;
+    final recent = history.length > 7 ? history.sublist(history.length - 7) : history;
     final spo2Values = recent.map((d) => d.spo2.toDouble()).toList();
     final variance = _calculateVariance(spo2Values);
-
-    return (100 - variance * 5)
-        .clamp(0, 100); // Moins de variance = plus stable
+    
+    return (100 - variance * 5).clamp(0, 100); // Moins de variance = plus stable
   }
 
   HealthScoreLevel _getHealthScoreLevel(double score) {
@@ -455,14 +335,80 @@ class HealthForecastService {
   }
 
   String _getScoreInterpretation(double score) {
-    if (score >= 80)
-      return 'Votre état est stable et votre récupération progresse très bien.';
-    if (score >= 65)
-      return 'Votre santé est bonne. Continuez votre suivi habituel.';
-    if (score >= 50)
-      return 'Votre état est stable. Restez vigilant à vos symptômes.';
-    if (score >= 35)
-      return 'Votre état nécessite une attention particulière et quelques ajustements.';
-    return 'Action requise : contactez votre équipe médicale pour faire le point.';
+    if (score >= 80) return 'État de santé excellent avec pronostic très favorable';
+    if (score >= 65) return 'Bonne santé générale avec quelques points d\'attention';
+    if (score >= 50) return 'État stable nécessitant une surveillance régulière';
+    if (score >= 35) return 'Situation préoccupante nécessitant des ajustements';
+    return 'État critique nécessitant une intervention médicale urgente';
+  }
+
+  /// Identifie la cause principale de la tendance actuelle
+  String _identifyPrimaryTrigger(
+    LongTermTrendAnalysis longTermAnalysis,
+    FragilityForecast fragilityForecast,
+  ) {
+    if (longTermAnalysis.hasInsufficientData) {
+      return 'Données insuffisantes pour identifier une tendance';
+    }
+
+    // Analyser les tendances long-terme
+    final spo2Trend = longTermAnalysis.longTermTrends.spo2Trend;
+    final breathingTrend = longTermAnalysis.longTermTrends.breathingTrend;
+    final pefTrend = longTermAnalysis.longTermTrends.pefTrend;
+
+    if (spo2Trend < -0.5) {
+      return 'Déclin progressif de la saturation en oxygène (SpO2)';
+    }
+    if (breathingTrend > 0.5) {
+      return 'Augmentation de la fréquence respiratoire';
+    }
+    if (pefTrend < -0.3) {
+      return 'Diminution du débit expiratoire de pointe (PEF)';
+    }
+    if (fragilityForecast.currentScore.value > 70) {
+      return 'Score de fragilité élevé détecté';
+    }
+
+    return 'Paramètres stables dans l\'ensemble';
+  }
+
+  /// Construit la raison de la confiance dans la prévision
+  String _buildConfidenceReason(
+    List<HealthData> fullHistory,
+    LongTermTrendAnalysis longTermAnalysis,
+  ) {
+    if (fullHistory.length < 10) {
+      return 'Données insuffisantes (moins de 10 mesures)';
+    }
+    if (longTermAnalysis.hasInsufficientData) {
+      return 'Historique trop court pour des tendances fiables';
+    }
+
+    final days = _calculateTimeSpan(fullHistory).inDays;
+    final dataPoints = fullHistory.length;
+    final trendStrength = longTermAnalysis.longTermTrends.trendStrength;
+
+    if (days >= 30 && dataPoints >= 50 && trendStrength > 0.7) {
+      return 'Prévision très fiable: $dataPoints mesures sur $days jours avec tendances claires';
+    }
+    if (days >= 14 && dataPoints >= 20) {
+      return 'Prévision fiable: historique suffisant ($dataPoints mesures sur $days jours)';
+    }
+    if (days >= 7) {
+      return 'Prévision modérée: historique court mais utilisable';
+    }
+
+    return 'Confiance limitée: continuez vos mesures régulières';
+  }
+
+  /// Compare les valeurs actuelles aux normes personnelles
+  String _buildPersonalNormComparison(LongTermTrendAnalysis longTermAnalysis) {
+    if (longTermAnalysis.hasInsufficientData) {
+      return 'Établissement de vos normes personnelles en cours';
+    }
+
+    final spo2Trend = longTermAnalysis.longTermTrends.spo2TrendDescription;
+    
+    return 'Tendance SpO2: $spo2Trend par rapport à votre moyenne habituelle';
   }
 }

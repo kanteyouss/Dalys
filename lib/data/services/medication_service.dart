@@ -1,17 +1,33 @@
 import 'package:flutter/material.dart';
 import '../models/medication_model.dart';
 import '../../features/alertes/services/service_notifications.dart';
+import '../../features/alertes/services/service_notifications_medication.dart';
 import '../models/modele_alerte.dart';
 
 class MedicationService extends ChangeNotifier {
   final List<Medication> _medications = [];
   final ServiceNotifications _notificationService = ServiceNotifications();
 
+  /// Instance statique pour accès depuis les callbacks de notification
+  static MedicationService? _instance;
+
   List<Medication> get medications => List.unmodifiable(_medications);
 
+  /// Récupère l'instance active du service (pour les callbacks)
+  static MedicationService? get instance => _instance;
+
   MedicationService() {
+    // Enregistrer l'instance pour accès global
+    _instance = this;
+    
     // Initialiser le service de notifications
     _notificationService.initialiser();
+    
+    // Configurer les callbacks pour les actions de notification
+    _notificationService.setMedicationActionCallbacks(
+      onMedicationTaken: _handleMedicationTaken,
+      onMedicationPostponed: _handleMedicationPostponed,
+    );
 
     // Données simulées pour la démo
     _medications.add(Medication(
@@ -71,35 +87,42 @@ class MedicationService extends ChangeNotifier {
       String description = med.aiRecommendation ??
           'Il est temps de prendre votre traitement : ${med.dosage}';
 
+      // ✅ TOUJOURS utiliser type medicament avec priorité modérée (pas critique)
+      // Ceci active le canal doux avec son calme et actions appropriées
       final alerte = ModeleAlerte(
         id: 'med_${med.id}_$i',
-        titre: 'Rappel : ${med.name}',
+        titre: '💊 ${med.name}',
         description: description,
         type: TypeAlerte.medicament,
         dateCreation: now,
+        dateEcheance: finalDate,
         statut: StatutAlerte.nouvelle,
-        niveauPriorite: med.isCritical ? 95 : 60,
-        tags: ['médicament', med.isCritical ? 'critique' : 'normal'],
+        niveauPriorite: med.isCritical ? 75 : 60, // 75 = important mais pas urgence
+        tags: ['médicament', 'rappel', med.isCritical ? 'important' : 'normal'],
         idUtilisateur: '1',
+        metadonnees: {
+          'medication_id': med.id,
+          'medication_name': med.name,
+          'dosage': med.dosage,
+          'time_slot': i,
+          'is_critical': med.isCritical,
+          'enable_tts': true, // Active synthèse vocale douce
+        },
+        actions: {
+          'pris': '✅ Marquer comme pris',
+          'reporter': '⏰ Reporter de 10 min',
+          'ignorer': '🔕 Ignorer',
+        },
       );
 
-      if (med.isCritical) {
-        // Pour les médicaments critiques, on programme plusieurs rappels (toutes les 10 min, 3 fois)
-        // pour simuler le "tant que pas confirmé"
-        for (var j = 0; j < 3; j++) {
-          final repeatDate = finalDate.add(Duration(minutes: j * 10));
-          _notificationService.programmerNotificationAlerte(
-            alerte.copiAvec(
-              id: 'med_${med.id}_${i}_rep_$j',
-              titre: j == 0 ? alerte.titre : '${alerte.titre} (Rappel $j)',
-              severite: NiveauSeverite.critique,
-            ),
-            repeatDate,
-          );
-        }
-      } else {
-        _notificationService.programmerNotificationAlerte(alerte, finalDate);
-      }
+      // ✅ UNE SEULE notification programmée (pas de répétitions automatiques)
+      // Le reporter sera géré manuellement par l'utilisateur
+      // Encoder les infos dans le payload: "alerteId|medicationId|timeSlot"
+      alerte.metadonnees['payload_encoded'] = '${alerte.id}|${med.id}|$i';
+      _notificationService.programmerNotificationMedicament(
+        alerte,
+        finalDate,
+      );
     }
   }
 
@@ -141,11 +164,69 @@ class MedicationService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Callback privé appelé quand l'utilisateur marque un médicament comme pris
+  void _handleMedicationTaken(String medicationId, int timeSlot) {
+    debugPrint('📝 Callback: Médicament pris - $medicationId, slot $timeSlot');
+    markMedicationTaken(medicationId, timeSlot);
+  }
+
+  /// Callback privé appelé quand l'utilisateur reporte un médicament
+  void _handleMedicationPostponed(String medicationId, int timeSlot, int minutes) {
+    debugPrint('📝 Callback: Médicament reporté - $medicationId, slot $timeSlot, +$minutes min');
+    postponeMedication(medicationId, timeSlot, minutes: minutes);
+  }
+
+  /// Marque un médicament comme pris et annule la notification
+  void markMedicationTaken(String medicationId, int timeSlot) {
+    final index = _medications.indexWhere((m) => m.id == medicationId);
+    if (index != -1) {
+      _medications[index] = _medications[index].copyWith(isTakenToday: true);
+      // Annuler la notification programmée
+      final alerteId = 'med_${medicationId}_$timeSlot';
+      final idNotification = alerteId.hashCode;
+      _notificationService.annulerNotification(idNotification);
+      notifyListeners();
+    }
+  }
+
+  /// Reporte un médicament de X minutes
+  void postponeMedication(String medicationId, int timeSlot, {int minutes = 10}) {
+    final index = _medications.indexWhere((m) => m.id == medicationId);
+    if (index != -1) {
+      final med = _medications[index];
+      final newTime = DateTime.now().add(Duration(minutes: minutes));
+      
+      final alerte = ModeleAlerte(
+        id: 'med_${med.id}_${timeSlot}_postponed',
+        titre: '💊 ${med.name} (Reporté)',
+        description: 'Rappel reporté : ${med.dosage}',
+        type: TypeAlerte.medicament,
+        dateCreation: DateTime.now(),
+        dateEcheance: newTime,
+        statut: StatutAlerte.nouvelle,
+        niveauPriorite: 70,
+        tags: ['médicament', 'rappel', 'reporté'],
+        metadonnees: {
+          'medication_id': med.id,
+          'postponed': true,
+          'enable_tts': true,
+        },
+        actions: {
+          'pris': '✅ Marquer comme pris',
+          'reporter': '⏰ Reporter encore',
+          'ignorer': '🔕 Ignorer',
+        },
+      );
+      
+      _notificationService.programmerNotificationMedicament(alerte, newTime);
+    }
+  }
+
   void removeMedication(String id) {
     final index = _medications.indexWhere((m) => m.id == id);
     if (index != -1) {
       final med = _medications[index];
-      // Annuler les notifications (y compris les répétitions)
+      // Annuler toutes les notifications pour ce médicament
       for (var i = 0; i < med.schedule.length; i++) {
         _notificationService
             .annulerNotificationLocale('med_${med.id}_$i'.hashCode);

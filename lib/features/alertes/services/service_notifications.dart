@@ -1,10 +1,12 @@
 import 'dart:io' show Platform;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:dalys/data/models/modele_alerte.dart';
+import 'package:dalys/data/services/service_vocal.dart';
 import 'service_geolocalisation.dart';
 
 /// Service de gestion des notifications locales pour l'application E-Santé 4.0
@@ -24,14 +26,34 @@ class ServiceNotifications {
   final FlutterLocalNotificationsPlugin _pluginNotifications =
       FlutterLocalNotificationsPlugin();
 
+  /// Getter pour accès au plugin depuis les extensions
+  FlutterLocalNotificationsPlugin get pluginNotifications =>
+      _pluginNotifications;
+
   /// État d'initialisation du service
   bool _estInitialise = false;
 
   /// Service des paramètres de notification
   dynamic _settingsService;
 
+  /// Callbacks pour les actions de médicaments
+  Function(String medicationId, int timeSlot)? _onMedicationTaken;
+  Function(String medicationId, int timeSlot, int minutes)?
+      _onMedicationPostponed;
+
   void setSettingsService(dynamic service) {
     _settingsService = service;
+  }
+
+  /// Configure les callbacks pour les actions de médicaments
+  void setMedicationActionCallbacks({
+    Function(String medicationId, int timeSlot)? onMedicationTaken,
+    Function(String medicationId, int timeSlot, int minutes)?
+        onMedicationPostponed,
+  }) {
+    _onMedicationTaken = onMedicationTaken;
+    _onMedicationPostponed = onMedicationPostponed;
+    debugPrint('✅ Callbacks médicaments configurés');
   }
 
   bool _estAutorise(String categorie) {
@@ -64,13 +86,39 @@ class ServiceNotifications {
         '@mipmap/ic_launcher',
       );
 
-      // Configuration iOS/macOS
+      // Catégories iOS pour actions de notifications
+      final iosMedicationCategory = DarwinNotificationCategory(
+        'MEDICATION_CATEGORY',
+        actions: [
+          DarwinNotificationAction.plain(
+            'pris',
+            '✅ Pris',
+            options: <DarwinNotificationActionOption>{
+              DarwinNotificationActionOption.destructive,
+            },
+          ),
+          DarwinNotificationAction.plain(
+            'reporter',
+            '⏰ +10 min',
+          ),
+          DarwinNotificationAction.plain(
+            'ignorer',
+            '🔕 Ignorer',
+            options: <DarwinNotificationActionOption>{
+              DarwinNotificationActionOption.destructive,
+            },
+          ),
+        ],
+      );
+
+      // Configuration iOS/macOS avec catégories
       final parametresInitialisationDarwin = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
         requestCriticalPermission: true,
         onDidReceiveLocalNotification: _gererNotificationLocaleRecue,
+        notificationCategories: [iosMedicationCategory],
       );
 
       // Configuration Linux
@@ -189,13 +237,15 @@ class ServiceNotifications {
       ),
 
       // Canal pour rappels médicaments
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         'canal_medicaments',
         'Rappels Médicaments',
         description: 'Rappels pour la prise de médicaments',
         importance: Importance.high,
         playSound: true,
         enableVibration: true,
+        vibrationPattern:
+            Int64List.fromList([0, 500, 200, 500]), // Vibration douce
         showBadge: true,
         ledColor: Colors.green,
       ),
@@ -559,9 +609,43 @@ class ServiceNotifications {
         htmlFormatSummaryText: false,
       ),
       ticker: '${alerte.type.libelle}: ${alerte.titre}',
-      category: _obtenirCategorieAndroid(alerte),
       visibility: NotificationVisibility.public,
+      actions: _mapperActionsAndroid(alerte),
     );
+  }
+
+  /// Mappe les actions du modèle d'alerte vers les actions Android
+  List<AndroidNotificationAction>? _mapperActionsAndroid(ModeleAlerte alerte) {
+    if (alerte.actions.isEmpty) return null;
+
+    final actionsAndroid = <AndroidNotificationAction>[];
+
+    alerte.actions.forEach((key, label) {
+      // Déterminer si l'action est destructive ou nécessite le premier plan
+      bool showsUserInterface = true;
+      bool cancelNotification = true;
+
+      // Configuration spécifique selon le type d'action
+      if (key == 'ignorer') {
+        cancelNotification = true;
+        showsUserInterface = false;
+      } else if (key == 'pris') {
+        cancelNotification = true;
+        showsUserInterface = false; // Action en arrière-plan possible
+      } else if (key == 'reporter') {
+        cancelNotification = true;
+        showsUserInterface = false;
+      }
+
+      actionsAndroid.add(AndroidNotificationAction(
+        key,
+        label,
+        showsUserInterface: showsUserInterface,
+        cancelNotification: cancelNotification,
+      ));
+    });
+
+    return actionsAndroid;
   }
 
   /// Configure les détails iOS/macOS de la notification
@@ -719,11 +803,112 @@ class ServiceNotifications {
   /// Gère les actions sur les notifications
   void _gererActionNotification(NotificationResponse response) {
     final payload = response.payload;
+    final actionId = response.actionId;
+
     if (payload != null) {
-      debugPrint('👆 Action notification: $payload');
+      debugPrint('👆 Action notification: $payload, actionId: $actionId');
+
+      // Gestion des actions médicaments
+      if (actionId != null) {
+        _gererActionMedicament(actionId, payload);
+        return;
+      }
+
+      // Si tap sur notification médicament (pas sur bouton), jouer TTS
+      if (payload.startsWith('med_')) {
+        _jouerTTSMedicament(payload);
+      }
 
       // Navigation vers l'alerte concernée
       _naviguerVersAlerte(payload);
+    }
+  }
+
+  /// Joue le TTS quand l'utilisateur ouvre la notification médicament
+  void _jouerTTSMedicament(String payload) {
+    try {
+      // Extraire le nom du médicament du payload si disponible
+      final parts = payload.split('|');
+      if (parts.length >= 2) {
+        final medicationId = parts[1];
+        // Utiliser ServiceVocal pour annoncer
+        ServiceVocal().parler(
+          'Il est l\'heure de prendre votre médicament',
+          niveau: NiveauNotification.alerte,
+        );
+        debugPrint('🗣️ TTS médicament lancé pour: $medicationId');
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur TTS notification: $e');
+    }
+  }
+
+  /// Gère les actions spécifiques aux notifications de médicaments
+  void _gererActionMedicament(String actionId, String payload) {
+    try {
+      // Parse le payload pour extraire les métadonnées
+      // Format: "alerteId|medicationId|timeSlot"
+      final parts = payload.split('|');
+      final alerteId = parts.isNotEmpty ? parts[0] : payload;
+      final idNotification = alerteId.hashCode;
+
+      String? medicationId;
+      int? timeSlot;
+
+      // Extraire medicationId et timeSlot si disponibles
+      if (parts.length >= 3) {
+        medicationId = parts[1];
+        timeSlot = int.tryParse(parts[2]);
+      }
+
+      switch (actionId) {
+        case 'pris':
+          debugPrint('✅ Médicament marqué comme pris: $alerteId');
+          // Annuler la notification
+          annulerNotification(idNotification);
+
+          // Appeler le callback si disponible
+          if (medicationId != null &&
+              timeSlot != null &&
+              _onMedicationTaken != null) {
+            _onMedicationTaken!(medicationId, timeSlot);
+            debugPrint(
+                '🔔 Callback "pris" exécuté: $medicationId, slot $timeSlot');
+          } else {
+            debugPrint(
+                '⚠️ Callback "pris" non disponible ou données manquantes');
+          }
+          break;
+
+        case 'reporter':
+          debugPrint('⏰ Médicament reporté de 10 minutes: $alerteId');
+          // Annuler la notification actuelle
+          annulerNotification(idNotification);
+
+          // Appeler le callback si disponible
+          if (medicationId != null &&
+              timeSlot != null &&
+              _onMedicationPostponed != null) {
+            _onMedicationPostponed!(medicationId, timeSlot, 10);
+            debugPrint(
+                '🔔 Callback "reporter" exécuté: $medicationId, slot $timeSlot, +10 min');
+          } else {
+            debugPrint(
+                '⚠️ Callback "reporter" non disponible ou données manquantes');
+          }
+          break;
+
+        case 'ignorer':
+          debugPrint('🔕 Notification médicament ignorée: $alerteId');
+          // Simplement annuler la notification
+          annulerNotification(idNotification);
+          break;
+
+        default:
+          debugPrint('❓ Action inconnue: $actionId');
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur gestion action médicament: $e');
     }
   }
 
